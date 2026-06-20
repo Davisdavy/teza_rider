@@ -1,0 +1,119 @@
+import 'package:flutter/material.dart';
+import '../models/user.dart';
+import '../models/rider.dart';
+import '../services/api_service.dart';
+
+class AuthProvider extends ChangeNotifier {
+  final ApiService _apiService;
+  UserAccount? _currentUser;
+  RiderProfile? _riderProfile;
+  String? _token;
+  bool _isAuthenticated = false;
+  bool _isLoading = false;
+  String? _errorMessage;
+
+  AuthProvider(this._apiService);
+
+  UserAccount? get currentUser => _currentUser;
+  RiderProfile? get riderProfile => _riderProfile;
+  String? get token => _token;
+  bool get isAuthenticated => _isAuthenticated;
+  bool get isLoading => _isLoading;
+  String? get errorMessage => _errorMessage;
+
+  bool get isRider => _currentUser?.role == 'RIDER';
+  bool get isApproved => _riderProfile?.onboardingStatus == 'APPROVED';
+
+  Future<bool> login(String email, String password) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final authData = await _apiService.login(email, password);
+      _token = authData['accessToken'];
+      _apiService.setToken(_token);
+
+      // Fetch user profile info
+      _currentUser = await _apiService.getMe();
+
+      // Ensure user has RIDER role
+      if (!isRider) {
+        _token = null;
+        _currentUser = null;
+        _apiService.setToken(null);
+        _isAuthenticated = false;
+        _errorMessage = 'Access denied: Only Rider accounts can log in here.';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+
+      // Fetch rider profile info
+      _riderProfile = await _apiService.getRiderProfile();
+
+      _isAuthenticated = true;
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _token = null;
+      _currentUser = null;
+      _riderProfile = null;
+      _apiService.setToken(null);
+      _isAuthenticated = false;
+      _errorMessage = e.toString().replaceFirst('Exception: ', '');
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<void> reloadProfile() async {
+    if (!_isAuthenticated) return;
+    try {
+      _riderProfile = await _apiService.getRiderProfile();
+      notifyListeners();
+    } catch (e) {
+      _errorMessage = e.toString().replaceFirst('Exception: ', '');
+      notifyListeners();
+    }
+  }
+
+  Future<bool> updateProfileDetails({String? vehicleType, String? vehiclePlateNum}) async {
+    if (!_isAuthenticated) return false;
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      _riderProfile = await _apiService.updateRiderProfile(
+        vehicleType: vehicleType,
+        vehiclePlateNum: vehiclePlateNum,
+      );
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString().replaceFirst('Exception: ', '');
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  void logout() {
+    _token = null;
+    _currentUser = null;
+    _riderProfile = null;
+    _apiService.setToken(null);
+    _isAuthenticated = false;
+    _errorMessage = null;
+    notifyListeners();
+  }
+
+  void clearError() {
+    _errorMessage = null;
+    notifyListeners();
+  }
+}
