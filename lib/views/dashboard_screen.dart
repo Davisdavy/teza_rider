@@ -326,34 +326,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          AnimatedBuilder(
-            animation: _pulseController,
-            builder: (context, child) {
-              return Container(
-                padding: const EdgeInsets.all(32),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: const Color(0xFF00E676).withOpacity(0.04),
-                  border: Border.all(
-                    color: const Color(0xFF00E676).withOpacity(0.15 * _pulseController.value),
-                    width: 2,
-                  ),
-                ),
-                child: Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: const Color(0xFF00E676).withOpacity(0.08),
-                  ),
-                  child: const Icon(
-                    Icons.radar,
-                    color: Color(0xFF00E676),
-                    size: 40,
-                  ),
-                ),
-              );
-            },
-          ),
+          const RadarScanner(),
           const SizedBox(height: 32),
           Text(
             'Scanning for Delivery Offers',
@@ -910,6 +883,139 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
           ),
         );
       }),
+    );
+  }
+}
+
+class RadarScanner extends StatefulWidget {
+  const RadarScanner({super.key});
+
+  @override
+  State<RadarScanner> createState() => _RadarScannerState();
+}
+
+class _RadarScannerState extends State<RadarScanner> with TickerProviderStateMixin {
+  late AnimationController _rippleController;
+  late AnimationController _rotationController;
+
+  @override
+  void initState() {
+    super.initState();
+    _rippleController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 3),
+    )..repeat();
+
+    _rotationController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 4),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _rippleController.dispose();
+    _rotationController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 220,
+      height: 220,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Ripple 1
+          AnimatedBuilder(
+            animation: _rippleController,
+            builder: (context, child) {
+              final progress = _rippleController.value;
+              return Transform.scale(
+                scale: 1.0 + (progress * 1.5),
+                child: Container(
+                  width: 90,
+                  height: 90,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: const Color(0xFF00E676).withOpacity(0.12 * (1.0 - progress)),
+                    border: Border.all(
+                      color: const Color(0xFF00E676).withOpacity(0.3 * (1.0 - progress)),
+                      width: 1.5,
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+          // Ripple 2 (staggered by 0.5)
+          AnimatedBuilder(
+            animation: _rippleController,
+            builder: (context, child) {
+              final progress = (_rippleController.value + 0.5) % 1.0;
+              return Transform.scale(
+                scale: 1.0 + (progress * 1.5),
+                child: Container(
+                  width: 90,
+                  height: 90,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: const Color(0xFF00E676).withOpacity(0.12 * (1.0 - progress)),
+                    border: Border.all(
+                      color: const Color(0xFF00E676).withOpacity(0.3 * (1.0 - progress)),
+                      width: 1.5,
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+          // Sweep Rotation
+          RotationTransition(
+            turns: _rotationController,
+            child: Container(
+              width: 180,
+              height: 180,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: SweepGradient(
+                  colors: [
+                    const Color(0xFF00E676).withOpacity(0.12),
+                    const Color(0xFF00E676).withOpacity(0.0),
+                  ],
+                  stops: const [0.25, 1.0],
+                ),
+              ),
+            ),
+          ),
+          // Central Radar Base
+          Container(
+            width: 90,
+            height: 90,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: const Color(0xFF151622),
+              border: Border.all(
+                color: const Color(0xFF00E676).withOpacity(0.35),
+                width: 2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF00E676).withOpacity(0.15),
+                  blurRadius: 15,
+                  spreadRadius: 2,
+                )
+              ],
+            ),
+            child: const Icon(
+              Icons.radar,
+              color: Color(0xFF00E676),
+              size: 36,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
