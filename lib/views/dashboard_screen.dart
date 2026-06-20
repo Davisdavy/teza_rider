@@ -301,6 +301,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
           const SizedBox(height: 24),
           Text(
             'You are Offline',
+            textAlign: TextAlign.center,
             style: GoogleFonts.outfit(
               fontSize: 20,
               fontWeight: FontWeight.w700,
@@ -310,6 +311,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
           const SizedBox(height: 8),
           Text(
             'Toggle the switch above to go online and receive jobs.',
+            textAlign: TextAlign.center,
             style: GoogleFonts.inter(
               fontSize: 14,
               color: Colors.white.withOpacity(0.4),
