@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
 import '../models/delivery.dart';
 import '../models/offer.dart';
 import '../services/api_service.dart';
@@ -175,6 +177,14 @@ class JobProvider extends ChangeNotifier {
               delivery.dropoffAddress,
             );
 
+            // Play sound notification and vibrate on receive
+            try {
+              FlutterRingtonePlayer().playNotification();
+              HapticFeedback.vibrate();
+            } catch (e) {
+              debugPrint('Failed to play ringtone/vibrate: $e');
+            }
+
             _startCountdown();
             notifyListeners();
           }
@@ -196,9 +206,22 @@ class JobProvider extends ChangeNotifier {
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_offerCountdown > 0) {
         _offerCountdown--;
+        // Pulse vibrate every 2 seconds during active offer request
+        if (_offerCountdown % 2 == 0) {
+          try {
+            HapticFeedback.vibrate();
+          } catch (e) {
+            debugPrint('Failed to vibrate: $e');
+          }
+        }
         notifyListeners();
       } else {
         // Expired
+        try {
+          FlutterRingtonePlayer().stop();
+        } catch (e) {
+          debugPrint('Failed to stop sound: $e');
+        }
         if (_activeOffer != null) {
           // Log offer timeout rejection
           _analyticsService.logOfferRejected(
@@ -231,6 +254,11 @@ class JobProvider extends ChangeNotifier {
     final deliveryId = _activeOffer!.deliveryId;
     final fee = _activeOfferDelivery?.deliveryFee ?? 0.0;
     _stopCountdown();
+    try {
+      FlutterRingtonePlayer().stop();
+    } catch (e) {
+      debugPrint('Failed to stop sound: $e');
+    }
 
     try {
       await _apiService.respondToOffer(offerId, true);
@@ -266,6 +294,11 @@ class JobProvider extends ChangeNotifier {
     _activeOffer = null;
     _activeOfferDelivery = null;
     _stopCountdown();
+    try {
+      FlutterRingtonePlayer().stop();
+    } catch (e) {
+      debugPrint('Failed to stop sound: $e');
+    }
 
     try {
       await _apiService.respondToOffer(offerId, false);
