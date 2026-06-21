@@ -1,6 +1,7 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:flutter/foundation.dart';
+import '../firebase_options.dart';
 
 class AnalyticsService {
   static final AnalyticsService instance = AnalyticsService._internal();
@@ -15,7 +16,9 @@ class AnalyticsService {
   // Safe initialization that catches missing configuration files
   Future<void> initialize() async {
     try {
-      await Firebase.initializeApp();
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
       _analytics = FirebaseAnalytics.instance;
       _isInitialized = true;
       debugPrint('[Analytics] Firebase Analytics successfully initialized.');
