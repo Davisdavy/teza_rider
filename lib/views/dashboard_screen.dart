@@ -325,77 +325,80 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
   // Scanning radar view when online and standby
   Widget _buildScanningRadarView(JobProvider job) {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const RadarScanner(),
-          const SizedBox(height: 32),
-          Text(
-            'Scanning for Delivery Offers',
-            style: GoogleFonts.outfit(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Keep this screen active to receive local dispatches...',
-            style: GoogleFonts.inter(
-              fontSize: 14,
-              color: Colors.white.withOpacity(0.4),
-            ),
-          ),
-          const SizedBox(height: 48),
-          
-          // Simulated Coordinates Panel
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            decoration: BoxDecoration(
-              color: const Color(0xFF151622),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.05),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const RadarScanner(),
+            const SizedBox(height: 32),
+            Text(
+              'Scanning for Delivery Offers',
+              style: GoogleFonts.outfit(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
               ),
             ),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.gps_fixed, color: Color(0xFF00BFA5), size: 16),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Simulated GPS (Lower Kabete)',
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white.withOpacity(0.6),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  'Lat: ${job.latitude.toStringAsFixed(6)}   •   Lng: ${job.longitude.toStringAsFixed(6)}',
-                  style: GoogleFonts.outfit(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: const Color(0xFF00E676),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Slight random drifts are applied to simulate movement.',
-                  style: GoogleFonts.inter(
-                    fontSize: 10,
-                    color: Colors.white.withOpacity(0.3),
-                  ),
-                ),
-              ],
+            const SizedBox(height: 8),
+            Text(
+              'Keep this screen active to receive local dispatches...',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                color: Colors.white.withOpacity(0.4),
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: 48),
+            
+            // Simulated Coordinates Panel
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF151622),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.05),
+                ),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.gps_fixed, color: Color(0xFF00BFA5), size: 16),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Simulated GPS (Lower Kabete)',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white.withOpacity(0.6),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'Lat: ${job.latitude.toStringAsFixed(6)}   •   Lng: ${job.longitude.toStringAsFixed(6)}',
+                    style: GoogleFonts.outfit(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF00E676),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Slight random drifts are applied to simulate movement.',
+                    style: GoogleFonts.inter(
+                      fontSize: 10,
+                      color: Colors.white.withOpacity(0.3),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -406,172 +409,174 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
     if (delivery == null) return const SizedBox();
 
     return Center(
-      child: Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: const Color(0xFF151622),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-            color: const Color(0xFF00E676).withOpacity(0.3),
-            width: 1.5,
+      child: SingleChildScrollView(
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: const Color(0xFF151622),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: const Color(0xFF00E676).withOpacity(0.3),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF00E676).withOpacity(0.08),
+                blurRadius: 20,
+                spreadRadius: 2,
+              )
+            ],
           ),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF00E676).withOpacity(0.08),
-              blurRadius: 20,
-              spreadRadius: 2,
-            )
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Alert Title
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.flash_on, color: Color(0xFFFFB300), size: 24),
-                    const SizedBox(width: 8),
-                    Text(
-                      'NEW JOB OFFER',
-                      style: GoogleFonts.outfit(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                        letterSpacing: 0.8,
-                      ),
-                    ),
-                  ],
-                ),
-                // Time Countdown Indicator
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFF5252).withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Alert Title
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
                     children: [
-                      const Icon(Icons.timer_outlined, color: Color(0xFFFF5252), size: 14),
-                      const SizedBox(width: 4),
+                      const Icon(Icons.flash_on, color: Color(0xFFFFB300), size: 24),
+                      const SizedBox(width: 8),
                       Text(
-                        '${job.offerCountdown}s',
-                        style: GoogleFonts.inter(
-                          color: const Color(0xFFFF8A8A),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
+                        'NEW JOB OFFER',
+                        style: GoogleFonts.outfit(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                          letterSpacing: 0.8,
                         ),
                       ),
                     ],
                   ),
-                ),
-              ],
-            ),
-            const Divider(color: Colors.white10, height: 28),
-
-            // Locations
-            _buildLocationStep(
-              icon: Icons.circle,
-              iconColor: const Color(0xFF00E676),
-              title: 'PICKUP',
-              address: delivery.pickupAddress,
-            ),
-            const Padding(
-              padding: EdgeInsets.only(left: 11, top: 4, bottom: 4),
-              child: SizedBox(
-                height: 20,
-                child: VerticalDivider(color: Colors.white10, width: 2, thickness: 1.5),
-              ),
-            ),
-            _buildLocationStep(
-              icon: Icons.location_on,
-              iconColor: const Color(0xFFFF5252),
-              title: 'DROPOFF',
-              address: delivery.dropoffAddress,
-            ),
-
-            const SizedBox(height: 24),
-
-            // Estimated Delivery Fee
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.02),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: Colors.white10),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Payout Fee',
-                    style: GoogleFonts.inter(
-                      color: Colors.white.withOpacity(0.5),
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
+                  // Time Countdown Indicator
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFF5252).withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                  ),
-                  Text(
-                    'KSh ${delivery.deliveryFee.toStringAsFixed(2)}',
-                    style: GoogleFonts.outfit(
-                      color: const Color(0xFF00E676),
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
+                    child: Row(
+                      children: [
+                        const Icon(Icons.timer_outlined, color: Color(0xFFFF5252), size: 14),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${job.offerCountdown}s',
+                          style: GoogleFonts.inter(
+                            color: const Color(0xFFFF8A8A),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
-            ),
-            const SizedBox(height: 24),
-
-            // Buttons
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => job.declineOffer(),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      side: BorderSide(color: Colors.white.withOpacity(0.12)),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+              const Divider(color: Colors.white10, height: 28),
+  
+              // Locations
+              _buildLocationStep(
+                icon: Icons.circle,
+                iconColor: const Color(0xFF00E676),
+                title: 'PICKUP',
+                address: delivery.pickupAddress,
+              ),
+              const Padding(
+                padding: EdgeInsets.only(left: 11, top: 4, bottom: 4),
+                child: SizedBox(
+                  height: 20,
+                  child: VerticalDivider(color: Colors.white10, width: 2, thickness: 1.5),
+                ),
+              ),
+              _buildLocationStep(
+                icon: Icons.location_on,
+                iconColor: const Color(0xFFFF5252),
+                title: 'DROPOFF',
+                address: delivery.dropoffAddress,
+              ),
+  
+              const SizedBox(height: 24),
+  
+              // Estimated Delivery Fee
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.02),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.white10),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Payout Fee',
+                      style: GoogleFonts.inter(
+                        color: Colors.white.withOpacity(0.5),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
-                    child: Text(
-                      'Decline',
-                      style: GoogleFonts.inter(
-                        color: Colors.white70,
-                        fontWeight: FontWeight.w600,
+                    Text(
+                      'KSh ${delivery.deliveryFee.toStringAsFixed(2)}',
+                      style: GoogleFonts.outfit(
+                        color: const Color(0xFF00E676),
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+  
+              // Buttons
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => job.declineOffer(),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        side: BorderSide(color: Colors.white.withOpacity(0.12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: Text(
+                        'Decline',
+                        style: GoogleFonts.inter(
+                          color: Colors.white70,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () => job.acceptOffer(),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      backgroundColor: const Color(0xFF00E676),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => job.acceptOffer(),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        backgroundColor: const Color(0xFF00E676),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
-                    ),
-                    child: Text(
-                      'Accept Job',
-                      style: GoogleFonts.inter(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
+                      child: Text(
+                        'Accept Job',
+                        style: GoogleFonts.inter(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
-            ),
-          ],
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

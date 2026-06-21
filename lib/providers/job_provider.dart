@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 import '../models/delivery.dart';
 import '../models/offer.dart';
 import '../services/api_service.dart';
+import '../services/analytics_service.dart';
 
 class JobProvider extends ChangeNotifier {
   final ApiService _apiService;
+  final AnalyticsService _analyticsService;
 
   bool _isOnline = false;
   bool _isLoading = false;
@@ -27,7 +29,7 @@ class JobProvider extends ChangeNotifier {
 
   final Random _random = Random();
 
-  JobProvider(this._apiService);
+  JobProvider(this._apiService, this._analyticsService);
 
   bool get isOnline => _isOnline;
   bool get isLoading => _isLoading;
@@ -89,8 +91,11 @@ class JobProvider extends ChangeNotifier {
 
     try {
       // Update profile available status in backend
-      await _apiService.updateRiderProfile(available: online);
+      final profile = await _apiService.updateRiderProfile(available: online);
       _isOnline = online;
+
+      // Log duty status change
+      _analyticsService.logDutyStatus(online, profile.id, _latitude, _longitude);
 
       if (_isOnline) {
         // Send initial location
@@ -150,18 +155,29 @@ class JobProvider extends ChangeNotifier {
         final offers = await _apiService.getOffersForRider();
         if (offers.isNotEmpty) {
           final pendingOffer = offers.first;
-          // Fetch delivery details
-          final delivery = await _apiService.getDelivery(pendingOffer.deliveryId);
           
-          _activeOffer = pendingOffer;
-          _activeOfferDelivery = delivery;
-
           // Calculate remaining seconds
           final diff = pendingOffer.expiresAt.difference(DateTime.now()).inSeconds;
-          _offerCountdown = diff > 0 ? diff : 0;
+          if (diff > 0) {
+            // Fetch delivery details
+            final delivery = await _apiService.getDelivery(pendingOffer.deliveryId);
+            
+            _activeOffer = pendingOffer;
+            _activeOfferDelivery = delivery;
+            _offerCountdown = diff;
 
-          _startCountdown();
-          notifyListeners();
+            // Log offer received
+            _analyticsService.logOfferReceived(
+              pendingOffer.id,
+              pendingOffer.deliveryId,
+              delivery.deliveryFee,
+              delivery.pickupAddress,
+              delivery.dropoffAddress,
+            );
+
+            _startCountdown();
+            notifyListeners();
+          }
         }
       } catch (e) {
         debugPrint('Failed to poll offers: $e');
@@ -183,6 +199,14 @@ class JobProvider extends ChangeNotifier {
         notifyListeners();
       } else {
         // Expired
+        if (_activeOffer != null) {
+          // Log offer timeout rejection
+          _analyticsService.logOfferRejected(
+            _activeOffer!.id,
+            _activeOffer!.deliveryId,
+            'timeout',
+          );
+        }
         _activeOffer = null;
         _activeOfferDelivery = null;
         _stopCountdown();
@@ -204,10 +228,15 @@ class JobProvider extends ChangeNotifier {
     notifyListeners();
 
     final offerId = _activeOffer!.id;
+    final deliveryId = _activeOffer!.deliveryId;
+    final fee = _activeOfferDelivery?.deliveryFee ?? 0.0;
     _stopCountdown();
 
     try {
       await _apiService.respondToOffer(offerId, true);
+      
+      // Log offer accepted
+      _analyticsService.logOfferAccepted(offerId, deliveryId, fee);
       
       // Successfully accepted. Check active job to load it
       _activeOffer = null;
@@ -233,12 +262,17 @@ class JobProvider extends ChangeNotifier {
     notifyListeners();
 
     final offerId = _activeOffer!.id;
+    final deliveryId = _activeOffer!.deliveryId;
     _activeOffer = null;
     _activeOfferDelivery = null;
     _stopCountdown();
 
     try {
       await _apiService.respondToOffer(offerId, false);
+
+      // Log offer declined
+      _analyticsService.logOfferRejected(offerId, deliveryId, 'manual');
+
       _isLoading = false;
       notifyListeners();
       return true;
@@ -262,6 +296,9 @@ class JobProvider extends ChangeNotifier {
         _activeJob!.id,
         newStatus,
       );
+
+      // Log delivery execution progress step
+      _analyticsService.logDeliveryStatus(_activeJob!.id, newStatus);
 
       if (newStatus == 'DELIVERED' || newStatus == 'CANCELLED') {
         _activeJob = null;

@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'services/analytics_service.dart';
 import 'services/api_service.dart';
 import 'providers/auth_provider.dart';
 import 'providers/job_provider.dart';
 import 'views/splash_screen.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await AnalyticsService.instance.initialize();
   runApp(const MyApp());
 }
 
@@ -21,13 +23,22 @@ class MyApp extends StatelessWidget {
         Provider<ApiService>(
           create: (_) => ApiService(),
         ),
+        Provider<AnalyticsService>(
+          create: (_) => AnalyticsService.instance,
+        ),
         ChangeNotifierProxyProvider<ApiService, AuthProvider>(
-          create: (context) => AuthProvider(context.read<ApiService>()),
-          update: (context, api, auth) => auth ?? AuthProvider(api),
+          create: (context) => AuthProvider(
+            context.read<ApiService>(),
+            context.read<AnalyticsService>(),
+          ),
+          update: (context, api, auth) => auth ?? AuthProvider(api, context.read<AnalyticsService>()),
         ),
         ChangeNotifierProxyProvider<ApiService, JobProvider>(
-          create: (context) => JobProvider(context.read<ApiService>()),
-          update: (context, api, job) => job ?? JobProvider(api),
+          create: (context) => JobProvider(
+            context.read<ApiService>(),
+            context.read<AnalyticsService>(),
+          ),
+          update: (context, api, job) => job ?? JobProvider(api, context.read<AnalyticsService>()),
         ),
       ],
       child: MaterialApp(

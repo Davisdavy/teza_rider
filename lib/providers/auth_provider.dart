@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import '../models/user.dart';
 import '../models/rider.dart';
 import '../services/api_service.dart';
+import '../services/analytics_service.dart';
 
 class AuthProvider extends ChangeNotifier {
   final ApiService _apiService;
+  final AnalyticsService _analyticsService;
   UserAccount? _currentUser;
   RiderProfile? _riderProfile;
   String? _token;
@@ -12,7 +14,7 @@ class AuthProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _errorMessage;
 
-  AuthProvider(this._apiService);
+  AuthProvider(this._apiService, this._analyticsService);
 
   UserAccount? get currentUser => _currentUser;
   RiderProfile? get riderProfile => _riderProfile;
@@ -53,6 +55,14 @@ class AuthProvider extends ChangeNotifier {
       _riderProfile = await _apiService.getRiderProfile();
 
       _isAuthenticated = true;
+
+      // Log login event
+      _analyticsService.logLogin(
+        _currentUser!.id,
+        _currentUser!.email,
+        _currentUser!.role,
+      );
+
       _isLoading = false;
       notifyListeners();
       return true;
