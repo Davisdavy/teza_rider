@@ -179,10 +179,15 @@ class JobProvider extends ChangeNotifier {
 
             // Play sound notification and vibrate on receive
             try {
-              FlutterRingtonePlayer().playNotification();
+              FlutterRingtonePlayer().play(
+                fromAsset: 'assets/sounds/offer_alert_bell.mp3',
+                looping: false,
+                volume: 1.0,
+                asAlarm: false,
+              );
               HapticFeedback.vibrate();
             } catch (e) {
-              debugPrint('Failed to play ringtone/vibrate: $e');
+              debugPrint('Failed to play custom ringtone/vibrate: $e');
             }
 
             _startCountdown();
