@@ -5,6 +5,7 @@ import '../models/rider.dart';
 import '../models/delivery.dart';
 import '../models/offer.dart';
 import '../models/notification.dart';
+import '../models/rider_stats.dart';
 
 class ApiService {
   static const String baseUrl = 'http://192.168.100.8:8080';
@@ -225,6 +226,17 @@ class ApiService {
     final response = await http.put(url, headers: _headers());
 
     if (response.statusCode != 204 && response.statusCode != 200) {
+      throw Exception(_parseError(response));
+    }
+  }
+
+  Future<RiderStats> getRiderStats() async {
+    final url = Uri.parse('$baseUrl/api/delivery/rider/stats');
+    final response = await http.get(url, headers: _headers());
+
+    if (response.statusCode == 200) {
+      return RiderStats.fromJson(jsonDecode(response.body));
+    } else {
       throw Exception(_parseError(response));
     }
   }

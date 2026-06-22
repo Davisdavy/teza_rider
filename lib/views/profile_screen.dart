@@ -31,6 +31,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (_vehicleTypes.contains(type.toUpperCase())) {
         _selectedVehicleType = type.toUpperCase();
       }
+      
+      // Fetch stats once on screen enter
+      Provider.of<JobProvider>(context, listen: false).fetchRiderStats();
+      
       _isInit = false;
     }
   }
@@ -79,6 +83,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
+    final jobProvider = Provider.of<JobProvider>(context);
     final rider = authProvider.riderProfile;
     final user = authProvider.currentUser;
 
@@ -114,6 +119,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               // Rating Banner
               _buildRatingCard(),
               const SizedBox(height: 24),
+
+              // Stats Dashboard Section
+              _buildStatsSection(jobProvider),
+              const SizedBox(height: 28),
 
               // Vehicle Editing Form
               Text(
@@ -365,6 +374,118 @@ class _ProfileScreenState extends State<ProfileScreen> {
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
         borderSide: const BorderSide(color: Color(0xFFFF5252), width: 1.5),
+      ),
+    );
+  }
+
+  Widget _buildStatsSection(JobProvider jobProvider) {
+    final stats = jobProvider.stats;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'ACTIVITY DASHBOARD',
+          style: GoogleFonts.inter(
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+            color: Colors.white30,
+            letterSpacing: 0.8,
+          ),
+        ),
+        const SizedBox(height: 12),
+        GridView.count(
+          crossAxisCount: 2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          mainAxisSpacing: 16,
+          crossAxisSpacing: 16,
+          childAspectRatio: 1.35,
+          children: [
+            _buildStatCard(
+              title: 'Deliveries Made',
+              value: stats?.completedDeliveries.toString() ?? '0',
+              icon: Icons.check_circle_outline,
+              color: const Color(0xFF00E676),
+            ),
+            _buildStatCard(
+              title: 'Canceled Runs',
+              value: stats?.cancelledDeliveries.toString() ?? '0',
+              icon: Icons.cancel_outlined,
+              color: const Color(0xFFFF5252),
+            ),
+            _buildStatCard(
+              title: 'Offers Declined',
+              value: stats?.declinedOffers.toString() ?? '0',
+              icon: Icons.block_flipped,
+              color: const Color(0xFFFF9100),
+            ),
+            _buildStatCard(
+              title: 'Offers Expired',
+              value: stats?.expiredOffers.toString() ?? '0',
+              icon: Icons.timer_outlined,
+              color: Colors.white38,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatCard({
+    required String title,
+    required String value,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF151622),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withOpacity(0.06)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Icon(icon, color: color, size: 22),
+              Container(
+                width: 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: color.withOpacity(0.5),
+                ),
+              ),
+            ],
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                value,
+                style: GoogleFonts.outfit(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                title,
+                style: GoogleFonts.inter(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white30,
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

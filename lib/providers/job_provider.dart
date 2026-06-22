@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
 import '../models/delivery.dart';
 import '../models/offer.dart';
+import '../models/rider_stats.dart';
 import '../services/api_service.dart';
 import '../services/analytics_service.dart';
 
@@ -23,6 +24,7 @@ class JobProvider extends ChangeNotifier {
   DeliveryOffer? _activeOffer;
   Delivery? _activeOfferDelivery;
   Delivery? _activeJob;
+  RiderStats? _stats;
 
   Timer? _locationTimer;
   Timer? _offersPollTimer;
@@ -43,6 +45,7 @@ class JobProvider extends ChangeNotifier {
   Delivery? get activeOfferDelivery => _activeOfferDelivery;
   Delivery? get activeJob => _activeJob;
   int get offerCountdown => _offerCountdown;
+  RiderStats? get stats => _stats;
 
   // Initialize and check if there's any active job already assigned
   Future<void> checkActiveJob() async {
@@ -76,12 +79,30 @@ class JobProvider extends ChangeNotifier {
       } else {
         _activeJob = null;
       }
+      
+      // Load rider statistics
+      try {
+        _stats = await _apiService.getRiderStats();
+      } catch (statsError) {
+        debugPrint('Failed to load stats during checkActiveJob: $statsError');
+      }
+
       _isLoading = false;
       notifyListeners();
     } catch (e) {
       _isLoading = false;
       _errorMessage = e.toString().replaceFirst('Exception: ', '');
       notifyListeners();
+    }
+  }
+
+  // Fetch stats independently
+  Future<void> fetchRiderStats() async {
+    try {
+      _stats = await _apiService.getRiderStats();
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Failed to fetch rider stats: $e');
     }
   }
 
@@ -238,6 +259,7 @@ class JobProvider extends ChangeNotifier {
         _activeOffer = null;
         _activeOfferDelivery = null;
         _stopCountdown();
+        fetchRiderStats(); // Refresh stats on timeout
         notifyListeners();
       }
     });
@@ -311,6 +333,8 @@ class JobProvider extends ChangeNotifier {
       // Log offer declined
       _analyticsService.logOfferRejected(offerId, deliveryId, 'manual');
 
+      await fetchRiderStats(); // Refresh stats on decline
+
       _isLoading = false;
       notifyListeners();
       return true;
@@ -343,6 +367,8 @@ class JobProvider extends ChangeNotifier {
       } else {
         _activeJob = updated;
       }
+
+      await fetchRiderStats(); // Refresh stats on status update (e.g. delivery completion)
 
       _isLoading = false;
       notifyListeners();
