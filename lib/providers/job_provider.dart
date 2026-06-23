@@ -1,13 +1,14 @@
 import 'dart:async';
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
+import 'package:geolocator/geolocator.dart';
 import '../models/delivery.dart';
 import '../models/offer.dart';
 import '../models/rider_stats.dart';
 import '../services/api_service.dart';
 import '../services/analytics_service.dart';
+import '../services/location_service.dart';
 
 class JobProvider extends ChangeNotifier {
   final ApiService _apiService;
@@ -26,12 +27,11 @@ class JobProvider extends ChangeNotifier {
   Delivery? _activeJob;
   RiderStats? _stats;
 
-  Timer? _locationTimer;
+  final LocationService _locationService = LocationService();
+  StreamSubscription<Position>? _positionSubscription;
   Timer? _offersPollTimer;
   Timer? _countdownTimer;
   int _offerCountdown = 0;
-
-  final Random _random = Random();
 
   JobProvider(this._apiService, this._analyticsService);
 
@@ -112,6 +112,26 @@ class JobProvider extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
 
+    if (online) {
+      final hasPermission = await _locationService.handleLocationPermission();
+      if (!hasPermission) {
+        _isLoading = false;
+        _errorMessage = 'Location permission is required to go online.';
+        notifyListeners();
+        return false;
+      }
+
+      try {
+        final pos = await _locationService.getCurrentPosition();
+        if (pos != null) {
+          _latitude = pos.latitude;
+          _longitude = pos.longitude;
+        }
+      } catch (e) {
+        debugPrint('Failed to retrieve initial position: $e');
+      }
+    }
+
     try {
       // Update profile available status in backend
       final profile = await _apiService.updateRiderProfile(available: online);
@@ -146,26 +166,30 @@ class JobProvider extends ChangeNotifier {
 
   // Location Updates Loop
   void _startLocationUpdates() {
-    _locationTimer?.cancel();
-    _locationTimer = Timer.periodic(const Duration(seconds: 10), (timer) async {
-      if (!_isOnline) return;
-
-      // Simulate a small movement/drift (GPS simulation)
-      _latitude += (_random.nextDouble() - 0.5) * 0.00015;
-      _longitude += (_random.nextDouble() - 0.5) * 0.00015;
-
-      try {
-        await _apiService.updateLocation(_latitude, _longitude);
+    _stopLocationUpdates();
+    
+    _positionSubscription = _locationService.getPositionStream().listen(
+      (position) async {
+        if (!_isOnline) return;
+        _latitude = position.latitude;
+        _longitude = position.longitude;
         notifyListeners();
-      } catch (e) {
-        debugPrint('Failed to update location: $e');
-      }
-    });
+
+        try {
+          await _apiService.updateLocation(_latitude, _longitude);
+        } catch (e) {
+          debugPrint('Failed to update streaming location to API: $e');
+        }
+      },
+      onError: (e) {
+        debugPrint('Location stream error: $e');
+      },
+    );
   }
 
   void _stopLocationUpdates() {
-    _locationTimer?.cancel();
-    _locationTimer = null;
+    _positionSubscription?.cancel();
+    _positionSubscription = null;
   }
 
   // Offers Polling Loop

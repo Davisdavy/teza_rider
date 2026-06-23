@@ -45,5 +45,9 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Teza Rider needs access to your location to share your delivery transit progress with customers and merchants.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Teza Rider needs access to your location to match you with nearby delivery requests and update merchants on your delivery status.</string>
 </dict>
 </plist>

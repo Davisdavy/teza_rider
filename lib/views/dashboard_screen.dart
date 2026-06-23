@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import '../models/delivery.dart';
 import '../providers/auth_provider.dart';
 import '../providers/job_provider.dart';
 import 'profile_screen.dart';
@@ -14,6 +17,8 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> with TickerProviderStateMixin {
   late AnimationController _pulseController;
+  final MapController _mapController = MapController();
+  bool _isLightMap = false;
 
   @override
   void initState() {
@@ -350,7 +355,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
             ),
             const SizedBox(height: 48),
             
-            // Simulated Coordinates Panel
+            // GPS Coordinates Panel
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               decoration: BoxDecoration(
@@ -365,10 +370,10 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.gps_fixed, color: Color(0xFF00BFA5), size: 16),
+                      const Icon(Icons.gps_fixed, color: Color(0xFF00E676), size: 16),
                       const SizedBox(width: 8),
                       Text(
-                        'Simulated GPS (Lower Kabete)',
+                        'GPS Tracking Active',
                         style: GoogleFonts.inter(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
@@ -388,7 +393,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Slight random drifts are applied to simulate movement.',
+                    'Coordinates are updating in real-time.',
                     style: GoogleFonts.inter(
                       fontSize: 10,
                       color: Colors.white.withOpacity(0.3),
@@ -683,6 +688,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
             ),
           ),
           const SizedBox(height: 20),
+          _buildMapSection(job, delivery),
 
           // Details Card
           Container(
@@ -890,6 +896,276 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
           ),
         );
       }),
+    );
+  }
+
+  void _recenterMap(double lat, double lng, {double zoom = 15.0}) {
+    try {
+      _mapController.move(LatLng(lat, lng), zoom);
+    } catch (e) {
+      debugPrint('Error recentering map: $e');
+    }
+  }
+
+  Widget _buildMapSection(JobProvider job, Delivery delivery) {
+    // Current target coords based on job status
+    final isGoingToPickup = delivery.status == 'ASSIGNED' || delivery.status == 'ARRIVED';
+    final targetLat = isGoingToPickup ? delivery.pickupLatitude : delivery.dropoffLatitude;
+    final targetLng = isGoingToPickup ? delivery.pickupLongitude : delivery.dropoffLongitude;
+    final targetLabel = isGoingToPickup ? 'Pickup' : 'Dropoff';
+
+    final riderLatLng = LatLng(job.latitude, job.longitude);
+    final pickupLatLng = LatLng(delivery.pickupLatitude, delivery.pickupLongitude);
+    final dropoffLatLng = LatLng(delivery.dropoffLatitude, delivery.dropoffLongitude);
+    final targetLatLng = LatLng(targetLat, targetLng);
+
+    // Tile URLs
+    final darkTileUrl = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+    final lightTileUrl = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+
+    // Premium styling for polyline (route)
+    // Make paths bright and easy to see during the day
+    final routeColor = _isLightMap ? const Color(0xFF00796B) : const Color(0xFF00E676);
+    final totalPathColor = _isLightMap ? Colors.black38 : Colors.white24;
+
+    return Container(
+      height: 280,
+      margin: const EdgeInsets.only(bottom: 20),
+      decoration: BoxDecoration(
+        color: const Color(0xFF151622),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.06),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          )
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(19),
+        child: Stack(
+          children: [
+            FlutterMap(
+              mapController: _mapController,
+              options: MapOptions(
+                initialCenter: riderLatLng,
+                initialZoom: 14.5,
+                maxZoom: 18.0,
+                minZoom: 10.0,
+              ),
+              children: [
+                TileLayer(
+                  urlTemplate: _isLightMap ? lightTileUrl : darkTileUrl,
+                  subdomains: const ['a', 'b', 'c', 'd'],
+                  userAgentPackageName: 'com.wafula.teza.rider',
+                ),
+                PolylineLayer(
+                  polylines: [
+                    // Entire journey (Pickup to Dropoff) - dashed/thin
+                    Polyline(
+                      points: [pickupLatLng, dropoffLatLng],
+                      color: totalPathColor,
+                      strokeWidth: 2.0,
+                      pattern: StrokePattern.dashed(segments: [8, 4]),
+                    ),
+                    // Active leg (Rider to next Target) - bright and highly visible
+                    Polyline(
+                      points: [riderLatLng, targetLatLng],
+                      color: routeColor,
+                      strokeWidth: 4.5,
+                    ),
+                  ],
+                ),
+                MarkerLayer(
+                  markers: [
+                    // Pickup Marker
+                    Marker(
+                      point: pickupLatLng,
+                      width: 40,
+                      height: 40,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: const Color(0xFF151622).withOpacity(0.9),
+                          border: Border.all(color: const Color(0xFF00E676), width: 2),
+                        ),
+                        child: const Icon(
+                          Icons.storefront_rounded,
+                          color: Color(0xFF00E676),
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                    // Dropoff Marker
+                    Marker(
+                      point: dropoffLatLng,
+                      width: 40,
+                      height: 40,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: const Color(0xFF151622).withOpacity(0.9),
+                          border: Border.all(color: const Color(0xFFFF5252), width: 2),
+                        ),
+                        child: const Icon(
+                          Icons.location_on_rounded,
+                          color: Color(0xFFFF5252),
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                    // Rider (Current Position) Marker - Pulsing layout
+                    Marker(
+                      point: riderLatLng,
+                      width: 44,
+                      height: 44,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          // Outer glow circle
+                          Container(
+                            width: 24,
+                            height: 24,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: const Color(0xFF00BFA5).withOpacity(0.3),
+                            ),
+                          ),
+                          // Inner border and solid dot
+                          Container(
+                            width: 14,
+                            height: 14,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.white,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.4),
+                                  blurRadius: 4,
+                                  spreadRadius: 1,
+                                )
+                              ],
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(2.0),
+                              child: Container(
+                                decoration: const BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Color(0xFF00BFA5),
+                                ),
+                              ),
+                            ),
+                          ),
+                          // Small direction pointer pointing towards target
+                          Positioned(
+                            top: 4,
+                            child: Icon(
+                              Icons.navigation,
+                              size: 10,
+                              color: Colors.white.withOpacity(0.9),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+
+            // Top-left Style Toggle overlay
+            Positioned(
+              top: 12,
+              left: 12,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFF151622).withOpacity(0.9),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.white.withOpacity(0.1)),
+                ),
+                child: IconButton(
+                  icon: Icon(
+                    _isLightMap ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+                    color: _isLightMap ? Colors.white : const Color(0xFFFFB300),
+                    size: 18,
+                  ),
+                  tooltip: _isLightMap ? 'Switch to Dark Map' : 'Switch to Light Map (Day)',
+                  onPressed: () {
+                    setState(() {
+                      _isLightMap = !_isLightMap;
+                    });
+                  },
+                  constraints: const BoxConstraints(
+                    minWidth: 36,
+                    minHeight: 36,
+                  ),
+                  padding: EdgeInsets.zero,
+                ),
+              ),
+            ),
+
+            // Right controls overlay
+            Positioned(
+              bottom: 12,
+              right: 12,
+              child: Column(
+                children: [
+                  // Recenter on Target
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF151622).withOpacity(0.9),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white.withOpacity(0.1)),
+                    ),
+                    child: IconButton(
+                      icon: Icon(
+                        isGoingToPickup ? Icons.storefront_outlined : Icons.flag_outlined,
+                        color: const Color(0xFF00E676),
+                        size: 18,
+                      ),
+                      tooltip: 'Center on $targetLabel',
+                      onPressed: () => _recenterMap(targetLat, targetLng),
+                      constraints: const BoxConstraints(
+                        minWidth: 36,
+                        minHeight: 36,
+                      ),
+                      padding: EdgeInsets.zero,
+                    ),
+                  ),
+                  // Recenter on Me
+                  Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF151622).withOpacity(0.9),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white.withOpacity(0.1)),
+                    ),
+                    child: IconButton(
+                      icon: const Icon(
+                        Icons.my_location,
+                        color: Color(0xFF00BFA5),
+                        size: 18,
+                      ),
+                      tooltip: 'Center on Me',
+                      onPressed: () => _recenterMap(job.latitude, job.longitude),
+                      constraints: const BoxConstraints(
+                        minWidth: 36,
+                        minHeight: 36,
+                      ),
+                      padding: EdgeInsets.zero,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
