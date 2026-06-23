@@ -21,6 +21,7 @@ class JobProvider extends ChangeNotifier {
   // Coordinates - Default Lower Kabete, Nairobi
   double _latitude = -1.2483;
   double _longitude = 36.7645;
+  double _speed = 0.0;
 
   DeliveryOffer? _activeOffer;
   Delivery? _activeOfferDelivery;
@@ -40,6 +41,7 @@ class JobProvider extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   double get latitude => _latitude;
   double get longitude => _longitude;
+  double get speed => _speed;
 
   DeliveryOffer? get activeOffer => _activeOffer;
   Delivery? get activeOfferDelivery => _activeOfferDelivery;
@@ -126,6 +128,7 @@ class JobProvider extends ChangeNotifier {
         if (pos != null) {
           _latitude = pos.latitude;
           _longitude = pos.longitude;
+          _speed = pos.speed;
         }
       } catch (e) {
         debugPrint('Failed to retrieve initial position: $e');
@@ -173,6 +176,7 @@ class JobProvider extends ChangeNotifier {
         if (!_isOnline) return;
         _latitude = position.latitude;
         _longitude = position.longitude;
+        _speed = position.speed;
         notifyListeners();
 
         try {

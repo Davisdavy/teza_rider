@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:http/http.dart' as http;
+import 'package:geolocator/geolocator.dart';
 import '../models/delivery.dart';
 import '../providers/auth_provider.dart';
 import '../providers/job_provider.dart';
@@ -750,6 +751,42 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
         break;
     }
 
+    // Dynamic ETA calculations
+    final isGoingToPickup = delivery.status == 'ASSIGNED' || delivery.status == 'ARRIVED';
+    final targetLat = isGoingToPickup ? delivery.pickupLatitude : delivery.dropoffLatitude;
+    final targetLng = isGoingToPickup ? delivery.pickupLongitude : delivery.dropoffLongitude;
+
+    double distanceKm = 0.0;
+    if (_activeLegRoute.isNotEmpty) {
+      for (int i = 0; i < _activeLegRoute.length - 1; i++) {
+        distanceKm += Geolocator.distanceBetween(
+          _activeLegRoute[i].latitude,
+          _activeLegRoute[i].longitude,
+          _activeLegRoute[i + 1].latitude,
+          _activeLegRoute[i + 1].longitude,
+        ) / 1000.0;
+      }
+    }
+
+    if (distanceKm == 0.0) {
+      distanceKm = Geolocator.distanceBetween(
+        job.latitude,
+        job.longitude,
+        targetLat,
+        targetLng,
+      ) / 1000.0;
+    }
+
+    double speedKmH = job.speed * 3.6;
+    if (speedKmH < 10.0) {
+      speedKmH = 30.0; // default average speed in traffic
+    } else if (speedKmH > 80.0) {
+      speedKmH = 80.0; // cap max speed
+    }
+
+    final timeMinutes = (distanceKm / speedKmH * 60).round();
+    final displayTime = timeMinutes < 1 && distanceKm > 0.05 ? 1 : timeMinutes;
+
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -767,7 +804,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                 const Icon(Icons.access_time_rounded, color: Color(0xFF00E676), size: 18),
                 const SizedBox(width: 8),
                 Text(
-                  'Estimated Delivery Time 18Min',
+                  'Estimated Delivery Time: ${displayTime}Min',
                   style: GoogleFonts.inter(
                     fontWeight: FontWeight.bold,
                     color: const Color(0xFF00E676),
