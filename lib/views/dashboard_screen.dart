@@ -764,10 +764,10 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
             ),
             child: Row(
               children: [
-                const Icon(Icons.directions_run, color: Color(0xFF00E676), size: 18),
+                const Icon(Icons.access_time_rounded, color: Color(0xFF00E676), size: 18),
                 const SizedBox(width: 8),
                 Text(
-                  'ACTIVE EXECUTION JOB',
+                  'Estimated Delivery Time 18Min',
                   style: GoogleFonts.inter(
                     fontWeight: FontWeight.bold,
                     color: const Color(0xFF00E676),
