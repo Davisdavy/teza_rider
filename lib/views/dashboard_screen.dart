@@ -1121,16 +1121,18 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                   polylines: [
                     if (delivery.status == 'PICKED_UP' || delivery.status == 'IN_TRANSIT') ...[
                       // Traversed portion of trip (greyed out)
-                      () {
+                      ...() {
                         final closestIdx = _findClosestPointIndex(riderLatLng, _tripRoute);
                         if (closestIdx > 0 && _tripRoute.isNotEmpty) {
-                          return Polyline(
-                            points: _tripRoute.sublist(0, closestIdx + 1),
-                            color: _isLightMap ? Colors.black26 : Colors.white24,
-                            strokeWidth: 4.0,
-                          );
+                          return [
+                            Polyline(
+                              points: _tripRoute.sublist(0, closestIdx + 1),
+                              color: _isLightMap ? Colors.black26 : Colors.white24,
+                              strokeWidth: 4.0,
+                            )
+                          ];
                         }
-                        return Polyline(points: [], color: Colors.transparent);
+                        return const <Polyline>[];
                       }(),
                       // Remaining portion of trip (active leg)
                       () {

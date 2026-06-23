@@ -244,6 +244,17 @@ class ApiService {
     }
   }
 
+  Future<DeliveryOffer> getOfferById(String offerId) async {
+    final url = Uri.parse('$baseUrl/api/delivery/offers/$offerId');
+    final response = await _sendWithRetry('GET', url);
+
+    if (response.statusCode == 200) {
+      return DeliveryOffer.fromJson(jsonDecode(response.body));
+    } else {
+      throw Exception(_parseError(response));
+    }
+  }
+
   Future<Delivery> getDelivery(String deliveryId) async {
     final url = Uri.parse('$baseUrl/api/delivery/$deliveryId');
     final response = await _sendWithRetry('GET', url);
@@ -330,6 +341,39 @@ class ApiService {
     final response = await _sendWithRetry('PUT', url);
 
     if (response.statusCode != 204 && response.statusCode != 200) {
+      throw Exception(_parseError(response));
+    }
+  }
+
+  Future<void> registerDeviceToken(String token, String? deviceId, String? deviceType, String? appVersion) async {
+    final url = Uri.parse('$baseUrl/api/notifications/tokens');
+    final response = await _sendWithRetry(
+      'POST',
+      url,
+      body: jsonEncode({
+        'token': token,
+        'deviceId': deviceId,
+        'deviceType': deviceType,
+        'appVersion': appVersion,
+      }),
+    );
+
+    if (response.statusCode != 200 && response.statusCode != 204 && response.statusCode != 201) {
+      throw Exception(_parseError(response));
+    }
+  }
+
+  Future<void> unregisterDeviceToken(String token) async {
+    final url = Uri.parse('$baseUrl/api/notifications/tokens/unregister');
+    final response = await _sendWithRetry(
+      'POST',
+      url,
+      body: jsonEncode({
+        'token': token,
+      }),
+    );
+
+    if (response.statusCode != 200 && response.statusCode != 204 && response.statusCode != 201) {
       throw Exception(_parseError(response));
     }
   }

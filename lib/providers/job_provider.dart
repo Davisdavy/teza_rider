@@ -1,16 +1,19 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/delivery.dart';
 import '../models/offer.dart';
 import '../models/rider_stats.dart';
 import '../services/api_service.dart';
 import '../services/analytics_service.dart';
 import '../services/location_service.dart';
+import '../services/notification_service.dart';
 
 class JobProvider extends ChangeNotifier {
   final ApiService _apiService;
@@ -41,7 +44,204 @@ class JobProvider extends ChangeNotifier {
   Timer? _countdownTimer;
   int _offerCountdown = 0;
 
-  JobProvider(this._apiService, this._analyticsService);
+  JobProvider(this._apiService, this._analyticsService) {
+    NotificationService.instance.onTokenRefresh.listen((newToken) async {
+      if (_isOnline) {
+        try {
+          String deviceId = await _getOrCreateDeviceId();
+          String deviceType = Platform.isAndroid ? 'android' : (Platform.isIOS ? 'ios' : 'unknown');
+          await _apiService.registerDeviceToken(newToken, deviceId, deviceType, '1.0.0');
+          debugPrint('Refreshed FCM Token registered successfully: $newToken');
+        } catch (e) {
+          debugPrint('Failed to register refreshed FCM Token: $e');
+        }
+      }
+    });
+
+    NotificationService.instance.onNotificationClick.listen((payload) async {
+      debugPrint('Notification clicked: $payload');
+      try {
+        final Map<String, dynamic> data = jsonDecode(payload);
+        final String type = data['type'] ?? 'NOTIFICATION';
+        final String? offerId = data['offerId'];
+        if (type == 'OFFER' && offerId != null && offerId.isNotEmpty) {
+          // Suppress sound when clicking the system tray notification (user is already opening it)
+          await handleOfferNotificationClick(offerId, playSound: false);
+        } else if (type == 'OFFER') {
+          await checkForOffers();
+        } else {
+          await checkActiveJob();
+        }
+      } catch (e) {
+        if (payload == 'OFFER') {
+          await checkForOffers();
+        } else {
+          await checkActiveJob();
+        }
+      }
+    });
+
+    NotificationService.instance.onNotificationReceived.listen((payload) async {
+      debugPrint('Notification received in foreground: $payload');
+      try {
+        final String type = payload['type'] ?? 'NOTIFICATION';
+        final String? offerId = payload['offerId'];
+        if (type == 'OFFER' && offerId != null && offerId.isNotEmpty) {
+          // Play sound when received in foreground to alert the rider immediately
+          await handleOfferNotificationClick(offerId, playSound: true);
+        }
+      } catch (e) {
+        debugPrint('Error handling foreground notification: $e');
+      }
+    });
+  }
+
+  Future<String> _getOrCreateDeviceId() async {
+    final prefs = await SharedPreferences.getInstance();
+    String? devId = prefs.getString('device_id');
+    if (devId == null) {
+      devId = DateTime.now().millisecondsSinceEpoch.toString();
+      await prefs.setString('device_id', devId);
+    }
+    return devId;
+  }
+
+  Future<void> _registerFCMToken() async {
+    try {
+      final notifService = NotificationService.instance;
+      await notifService.requestPermissions();
+      String? token = await notifService.getDeviceToken();
+      if (token != null) {
+        String deviceId = await _getOrCreateDeviceId();
+        String deviceType = Platform.isAndroid ? 'android' : (Platform.isIOS ? 'ios' : 'unknown');
+        await _apiService.registerDeviceToken(token, deviceId, deviceType, '1.0.0');
+        debugPrint('FCM Token registered successfully: $token');
+      }
+    } catch (e) {
+      debugPrint('Failed to register FCM Token: $e');
+    }
+  }
+
+  Future<void> _unregisterFCMToken() async {
+    try {
+      String? token = await NotificationService.instance.getDeviceToken();
+      if (token != null) {
+        await _apiService.unregisterDeviceToken(token);
+        debugPrint('FCM Token unregistered successfully');
+      }
+    } catch (e) {
+      debugPrint('Failed to unregister FCM Token: $e');
+    }
+  }
+
+  Future<void> checkForOffers() async {
+    if (!_isOnline || _activeJob != null || _activeOffer != null) return;
+
+    try {
+      final offers = await _apiService.getOffersForRider();
+      if (offers.isNotEmpty) {
+        final pendingOffer = offers.first;
+        
+        final diff = pendingOffer.expiresAt.difference(DateTime.now()).inSeconds;
+        if (diff > 0) {
+          final delivery = await _apiService.getDelivery(pendingOffer.deliveryId);
+          
+          _activeOffer = pendingOffer;
+          _activeOfferDelivery = delivery;
+          _offerCountdown = diff;
+
+          _analyticsService.logOfferReceived(
+            pendingOffer.id,
+            pendingOffer.deliveryId,
+            delivery.deliveryFee,
+            delivery.pickupAddress,
+            delivery.dropoffAddress,
+          );
+
+          try {
+            FlutterRingtonePlayer().play(
+              fromAsset: 'assets/sounds/offer_alert_bell.mp3',
+              looping: false,
+              volume: 1.0,
+              asAlarm: false,
+            );
+            HapticFeedback.vibrate();
+          } catch (e) {
+            debugPrint('Failed to play custom ringtone/vibrate: $e');
+          }
+
+          _startCountdown();
+          notifyListeners();
+        }
+      }
+    } catch (e) {
+      debugPrint('Failed to check offers manually: $e');
+    }
+  }
+
+  Future<void> handleOfferNotificationClick(String offerId, {bool playSound = false}) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final offer = await _apiService.getOfferById(offerId);
+
+      if (offer.status == 'EXPIRED' || offer.expiresAt.isBefore(DateTime.now())) {
+        _isLoading = false;
+        _errorMessage = 'This delivery offer has expired.';
+        _activeOffer = null;
+        _activeOfferDelivery = null;
+        notifyListeners();
+        return;
+      }
+
+      if (offer.status == 'PENDING') {
+        final diff = offer.expiresAt.difference(DateTime.now()).inSeconds;
+        if (diff > 0) {
+          final delivery = await _apiService.getDelivery(offer.deliveryId);
+          _activeOffer = offer;
+          _activeOfferDelivery = delivery;
+          _offerCountdown = diff;
+
+          _analyticsService.logOfferReceived(
+            offer.id,
+            offer.deliveryId,
+            delivery.deliveryFee,
+            delivery.pickupAddress,
+            delivery.dropoffAddress,
+          );
+
+          if (playSound) {
+            try {
+              FlutterRingtonePlayer().play(
+                fromAsset: 'assets/sounds/offer_alert_bell.mp3',
+                looping: false,
+                volume: 1.0,
+                asAlarm: false,
+              );
+              HapticFeedback.vibrate();
+            } catch (e) {
+              debugPrint('Failed to play custom ringtone/vibrate: $e');
+            }
+          }
+
+          _startCountdown();
+        } else {
+          _errorMessage = 'This delivery offer has expired.';
+        }
+      } else {
+        _errorMessage = 'This delivery offer is no longer available (Status: ${offer.status}).';
+      }
+
+      _isLoading = false;
+      notifyListeners();
+    } catch (e) {
+      _isLoading = false;
+      _errorMessage = 'Failed to fetch offer details: ${e.toString().replaceFirst('Exception: ', '')}';
+      notifyListeners();
+    }
+  }
 
   bool get isOnline => _isOnline;
   bool get isLoading => _isLoading;
@@ -163,12 +363,14 @@ class JobProvider extends ChangeNotifier {
         await _apiService.updateLocation(_latitude, _longitude);
         _startLocationUpdates();
         _startOffersPolling();
+        await _registerFCMToken();
       } else {
         _stopLocationUpdates();
         _stopOffersPolling();
         _activeOffer = null;
         _activeOfferDelivery = null;
         _stopCountdown();
+        await _unregisterFCMToken();
       }
 
       _isLoading = false;

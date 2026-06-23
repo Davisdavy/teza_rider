@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'services/analytics_service.dart';
 import 'services/api_service.dart';
+import 'services/notification_service.dart';
 import 'providers/auth_provider.dart';
 import 'providers/job_provider.dart';
 import 'views/splash_screen.dart';
@@ -10,6 +11,7 @@ import 'views/splash_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await AnalyticsService.instance.initialize();
+  await NotificationService.instance.initialize();
   
   final apiService = ApiService();
   await apiService.loadPersistedTokens();
