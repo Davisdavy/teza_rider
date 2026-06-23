@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
 import '../models/delivery.dart';
 import '../models/offer.dart';
 import '../models/rider_stats.dart';
@@ -28,6 +30,11 @@ class JobProvider extends ChangeNotifier {
   Delivery? _activeJob;
   RiderStats? _stats;
 
+  String? _currentArea;
+  DateTime? _lastGeocodeTime;
+  double? _lastGeocodeLatitude;
+  double? _lastGeocodeLongitude;
+
   final LocationService _locationService = LocationService();
   StreamSubscription<Position>? _positionSubscription;
   Timer? _offersPollTimer;
@@ -42,6 +49,7 @@ class JobProvider extends ChangeNotifier {
   double get latitude => _latitude;
   double get longitude => _longitude;
   double get speed => _speed;
+  String? get currentArea => _currentArea;
 
   DeliveryOffer? get activeOffer => _activeOffer;
   Delivery? get activeOfferDelivery => _activeOfferDelivery;
@@ -135,6 +143,7 @@ class JobProvider extends ChangeNotifier {
           _latitude = pos.latitude;
           _longitude = pos.longitude;
           _speed = pos.speed;
+          _updateCurrentArea(_latitude, _longitude);
         }
       } catch (e) {
         debugPrint('Failed to retrieve initial position: $e');
@@ -185,6 +194,8 @@ class JobProvider extends ChangeNotifier {
         _speed = position.speed;
         notifyListeners();
 
+        _updateCurrentArea(_latitude, _longitude);
+
         try {
           await _apiService.updateLocation(_latitude, _longitude);
         } catch (e) {
@@ -195,6 +206,62 @@ class JobProvider extends ChangeNotifier {
         debugPrint('Location stream error: $e');
       },
     );
+  }
+
+  Future<void> _updateCurrentArea(double lat, double lng) async {
+    final now = DateTime.now();
+    if (_lastGeocodeTime != null && 
+        now.difference(_lastGeocodeTime!).inSeconds < 30) {
+      return;
+    }
+    
+    // Check if coordinates changed
+    if (_lastGeocodeLatitude == lat && _lastGeocodeLongitude == lng) {
+      return;
+    }
+
+    _lastGeocodeTime = now;
+    _lastGeocodeLatitude = lat;
+    _lastGeocodeLongitude = lng;
+
+    try {
+      final url = Uri.parse('https://nominatim.openstreetmap.org/reverse?lat=$lat&lon=$lng&format=json');
+      final response = await http.get(
+        url,
+        headers: {
+          'User-Agent': 'teza-rider-app/1.0.0 (contact: support@teza.delivery)',
+        },
+      );
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final address = data['address'];
+        if (address != null) {
+          final road = address['road'];
+          final suburb = address['suburb'];
+          final neighborhood = address['neighbourhood'];
+          final city = address['city'] ?? address['town'] ?? address['village'];
+          
+          final List<String> parts = [];
+          if (road != null) parts.add(road);
+          if (suburb != null || neighborhood != null) {
+            parts.add(suburb ?? neighborhood);
+          } else if (city != null) {
+            parts.add(city);
+          }
+          
+          if (parts.isNotEmpty) {
+            _currentArea = parts.join(', ');
+          } else {
+            _currentArea = data['display_name']?.toString().split(',').first ?? 'Unknown Area';
+          }
+        } else {
+          _currentArea = data['display_name']?.toString().split(',').first ?? 'Unknown Area';
+        }
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Failed to reverse geocode: $e');
+    }
   }
 
   void _stopLocationUpdates() {

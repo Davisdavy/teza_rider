@@ -489,16 +489,19 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    'Lat: ${job.latitude.toStringAsFixed(6)}   •   Lng: ${job.longitude.toStringAsFixed(6)}',
+                    job.currentArea ?? 'Lat: ${job.latitude.toStringAsFixed(6)}   •   Lng: ${job.longitude.toStringAsFixed(6)}',
+                    textAlign: TextAlign.center,
                     style: GoogleFonts.outfit(
-                      fontSize: 15,
+                      fontSize: job.currentArea != null ? 14 : 15,
                       fontWeight: FontWeight.bold,
                       color: const Color(0xFF00E676),
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Coordinates are updating in real-time.',
+                    job.currentArea != null
+                        ? 'Current Location (Nearest Area/Landmark)'
+                        : 'Coordinates are updating in real-time.',
                     style: GoogleFonts.inter(
                       fontSize: 10,
                       color: Colors.white.withOpacity(0.3),
