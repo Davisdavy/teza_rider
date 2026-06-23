@@ -14,7 +14,11 @@ class AuthProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _errorMessage;
 
-  AuthProvider(this._apiService, this._analyticsService);
+  AuthProvider(this._apiService, this._analyticsService) {
+    _apiService.onSessionExpired = () {
+      logout();
+    };
+  }
 
   UserAccount? get currentUser => _currentUser;
   RiderProfile? get riderProfile => _riderProfile;
@@ -26,6 +30,52 @@ class AuthProvider extends ChangeNotifier {
   bool get isRider => _currentUser?.role == 'RIDER';
   bool get isApproved => _riderProfile?.onboardingStatus == 'APPROVED';
 
+  Future<bool> tryAutoLogin() async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      await _apiService.loadPersistedTokens();
+
+      if (_apiService.token == null) {
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+
+      _currentUser = await _apiService.getMe();
+
+      if (!isRider) {
+        await _apiService.clearTokens();
+        _currentUser = null;
+        _riderProfile = null;
+        _isAuthenticated = false;
+        _isLoading = false;
+        _errorMessage = 'Access denied: Only Rider accounts can log in here.';
+        notifyListeners();
+        return false;
+      }
+
+      _riderProfile = await _apiService.getRiderProfile();
+      _token = _apiService.token;
+      _isAuthenticated = true;
+
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      await _apiService.clearTokens();
+      _token = null;
+      _currentUser = null;
+      _riderProfile = null;
+      _isAuthenticated = false;
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
   Future<bool> login(String email, String password) async {
     _isLoading = true;
     _errorMessage = null;
@@ -34,16 +84,15 @@ class AuthProvider extends ChangeNotifier {
     try {
       final authData = await _apiService.login(email, password);
       _token = authData['accessToken'];
-      _apiService.setToken(_token);
+      final refresh = authData['refreshToken'];
+      await _apiService.setTokens(_token, refresh);
 
-      // Fetch user profile info
       _currentUser = await _apiService.getMe();
 
-      // Ensure user has RIDER role
       if (!isRider) {
+        await _apiService.clearTokens();
         _token = null;
         _currentUser = null;
-        _apiService.setToken(null);
         _isAuthenticated = false;
         _errorMessage = 'Access denied: Only Rider accounts can log in here.';
         _isLoading = false;
@@ -51,12 +100,9 @@ class AuthProvider extends ChangeNotifier {
         return false;
       }
 
-      // Fetch rider profile info
       _riderProfile = await _apiService.getRiderProfile();
-
       _isAuthenticated = true;
 
-      // Log login event
       _analyticsService.logLogin(
         _currentUser!.id,
         _currentUser!.email,
@@ -67,10 +113,10 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
+      await _apiService.clearTokens();
       _token = null;
       _currentUser = null;
       _riderProfile = null;
-      _apiService.setToken(null);
       _isAuthenticated = false;
       _errorMessage = e.toString().replaceFirst('Exception: ', '');
       _isLoading = false;
@@ -112,11 +158,11 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  void logout() {
+  Future<void> logout() async {
     _token = null;
     _currentUser = null;
     _riderProfile = null;
-    _apiService.setToken(null);
+    await _apiService.clearTokens();
     _isAuthenticated = false;
     _errorMessage = null;
     notifyListeners();

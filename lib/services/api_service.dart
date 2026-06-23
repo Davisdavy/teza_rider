@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user.dart';
 import '../models/rider.dart';
 import '../models/delivery.dart';
@@ -10,9 +11,44 @@ import '../models/rider_stats.dart';
 class ApiService {
   static const String baseUrl = 'http://192.168.100.8:8080';
   String? _token;
+  String? _refreshToken;
+  void Function()? onSessionExpired;
+  bool _isRefreshing = false;
+
+  String? get token => _token;
 
   void setToken(String? token) {
     _token = token;
+  }
+
+  Future<void> loadPersistedTokens() async {
+    final prefs = await SharedPreferences.getInstance();
+    _token = prefs.getString('accessToken');
+    _refreshToken = prefs.getString('refreshToken');
+  }
+
+  Future<void> setTokens(String? accessToken, String? refreshToken) async {
+    _token = accessToken;
+    _refreshToken = refreshToken;
+    final prefs = await SharedPreferences.getInstance();
+    if (accessToken != null) {
+      await prefs.setString('accessToken', accessToken);
+    } else {
+      await prefs.remove('accessToken');
+    }
+    if (refreshToken != null) {
+      await prefs.setString('refreshToken', refreshToken);
+    } else {
+      await prefs.remove('refreshToken');
+    }
+  }
+
+  Future<void> clearTokens() async {
+    _token = null;
+    _refreshToken = null;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('accessToken');
+    await prefs.remove('refreshToken');
   }
 
   Map<String, String> _headers({bool authenticated = true}) {
@@ -26,19 +62,85 @@ class ApiService {
     return headers;
   }
 
+  Future<http.Response> _sendRequest(
+    String method,
+    Uri url, {
+    Object? body,
+    bool authenticated = true,
+  }) async {
+    final headers = _headers(authenticated: authenticated);
+    switch (method.toUpperCase()) {
+      case 'POST':
+        return await http.post(url, headers: headers, body: body);
+      case 'PUT':
+        return await http.put(url, headers: headers, body: body);
+      case 'DELETE':
+        return await http.delete(url, headers: headers, body: body);
+      case 'GET':
+      default:
+        return await http.get(url, headers: headers);
+    }
+  }
+
+  Future<http.Response> _sendWithRetry(
+    String method,
+    Uri url, {
+    Object? body,
+    bool authenticated = true,
+  }) async {
+    var response = await _sendRequest(method, url, body: body, authenticated: authenticated);
+
+    if (response.statusCode == 401 && authenticated && _refreshToken != null && !_isRefreshing) {
+      _isRefreshing = true;
+      try {
+        final refreshUrl = Uri.parse('$baseUrl/api/auth/refresh');
+        final refreshResponse = await http.post(
+          refreshUrl,
+          headers: _headers(authenticated: false),
+          body: jsonEncode({'refreshToken': _refreshToken}),
+        );
+
+        if (refreshResponse.statusCode == 200) {
+          final data = jsonDecode(refreshResponse.body);
+          final newAccessToken = data['accessToken'];
+          final newRefreshToken = data['refreshToken'];
+          await setTokens(newAccessToken, newRefreshToken);
+          
+          // Retry the original request
+          response = await _sendRequest(method, url, body: body, authenticated: authenticated);
+        } else {
+          await clearTokens();
+          onSessionExpired?.call();
+        }
+      } catch (e) {
+        await clearTokens();
+        onSessionExpired?.call();
+      } finally {
+        _isRefreshing = false;
+      }
+    } else if (response.statusCode == 401 && authenticated) {
+      await clearTokens();
+      onSessionExpired?.call();
+    }
+
+    return response;
+  }
+
   // --- Auth Endpoints ---
 
   Future<Map<String, dynamic>> login(String email, String password) async {
     final url = Uri.parse('$baseUrl/api/auth/login');
-    final response = await http.post(
+    final response = await _sendWithRetry(
+      'POST',
       url,
-      headers: _headers(authenticated: false),
       body: jsonEncode({'email': email, 'password': password}),
+      authenticated: false,
     );
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       _token = data['accessToken'];
+      _refreshToken = data['refreshToken'];
       return data;
     } else {
       throw Exception(_parseError(response));
@@ -47,15 +149,17 @@ class ApiService {
 
   Future<Map<String, dynamic>> refreshToken(String refreshTxt) async {
     final url = Uri.parse('$baseUrl/api/auth/refresh');
-    final response = await http.post(
+    final response = await _sendWithRetry(
+      'POST',
       url,
-      headers: _headers(authenticated: false),
       body: jsonEncode({'refreshToken': refreshTxt}),
+      authenticated: false,
     );
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       _token = data['accessToken'];
+      _refreshToken = data['refreshToken'];
       return data;
     } else {
       throw Exception(_parseError(response));
@@ -64,7 +168,7 @@ class ApiService {
 
   Future<UserAccount> getMe() async {
     final url = Uri.parse('$baseUrl/api/users/me');
-    final response = await http.get(url, headers: _headers());
+    final response = await _sendWithRetry('GET', url);
 
     if (response.statusCode == 200) {
       return UserAccount.fromJson(jsonDecode(response.body));
@@ -77,7 +181,7 @@ class ApiService {
 
   Future<RiderProfile> getRiderProfile() async {
     final url = Uri.parse('$baseUrl/api/rider/profile');
-    final response = await http.get(url, headers: _headers());
+    final response = await _sendWithRetry('GET', url);
 
     if (response.statusCode == 200) {
       return RiderProfile.fromJson(jsonDecode(response.body));
@@ -97,9 +201,9 @@ class ApiService {
     if (vehiclePlateNum != null) body['vehiclePlateNum'] = vehiclePlateNum;
     if (available != null) body['available'] = available;
 
-    final response = await http.put(
+    final response = await _sendWithRetry(
+      'PUT',
       url,
-      headers: _headers(),
       body: jsonEncode(body),
     );
 
@@ -112,9 +216,9 @@ class ApiService {
 
   Future<void> updateLocation(double latitude, double longitude) async {
     final url = Uri.parse('$baseUrl/api/rider/location');
-    final response = await http.put(
+    final response = await _sendWithRetry(
+      'PUT',
       url,
-      headers: _headers(),
       body: jsonEncode({
         'latitude': latitude,
         'longitude': longitude,
@@ -130,7 +234,7 @@ class ApiService {
 
   Future<List<DeliveryOffer>> getOffersForRider() async {
     final url = Uri.parse('$baseUrl/api/delivery/rider/offers');
-    final response = await http.get(url, headers: _headers());
+    final response = await _sendWithRetry('GET', url);
 
     if (response.statusCode == 200) {
       final List<dynamic> list = jsonDecode(response.body);
@@ -142,7 +246,7 @@ class ApiService {
 
   Future<Delivery> getDelivery(String deliveryId) async {
     final url = Uri.parse('$baseUrl/api/delivery/$deliveryId');
-    final response = await http.get(url, headers: _headers());
+    final response = await _sendWithRetry('GET', url);
 
     if (response.statusCode == 200) {
       return Delivery.fromJson(jsonDecode(response.body));
@@ -153,9 +257,9 @@ class ApiService {
 
   Future<DeliveryOffer> respondToOffer(String offerId, bool accepted) async {
     final url = Uri.parse('$baseUrl/api/delivery/offers/$offerId/respond');
-    final response = await http.put(
+    final response = await _sendWithRetry(
+      'PUT',
       url,
-      headers: _headers(),
       body: jsonEncode({
         'accepted': accepted,
       }),
@@ -170,7 +274,7 @@ class ApiService {
 
   Future<List<Delivery>> getDeliveriesForRider() async {
     final url = Uri.parse('$baseUrl/api/delivery/rider');
-    final response = await http.get(url, headers: _headers());
+    final response = await _sendWithRetry('GET', url);
 
     if (response.statusCode == 200) {
       final List<dynamic> list = jsonDecode(response.body);
@@ -182,9 +286,9 @@ class ApiService {
 
   Future<Delivery> updateDeliveryStatus(String deliveryId, String status, {String? reason}) async {
     final url = Uri.parse('$baseUrl/api/delivery/$deliveryId/status');
-    final response = await http.put(
+    final response = await _sendWithRetry(
+      'PUT',
       url,
-      headers: _headers(),
       body: jsonEncode({
         'status': status,
         'reason': reason ?? 'Rider updated status to $status',
@@ -202,7 +306,7 @@ class ApiService {
 
   Future<List<NotificationModel>> getNotifications() async {
     final url = Uri.parse('$baseUrl/api/notifications');
-    final response = await http.get(url, headers: _headers());
+    final response = await _sendWithRetry('GET', url);
 
     if (response.statusCode == 200) {
       final List<dynamic> list = jsonDecode(response.body);
@@ -214,7 +318,7 @@ class ApiService {
 
   Future<void> markNotificationAsRead(String id) async {
     final url = Uri.parse('$baseUrl/api/notifications/$id/read');
-    final response = await http.put(url, headers: _headers());
+    final response = await _sendWithRetry('PUT', url);
 
     if (response.statusCode != 204 && response.statusCode != 200) {
       throw Exception(_parseError(response));
@@ -223,7 +327,7 @@ class ApiService {
 
   Future<void> markAllNotificationsAsRead() async {
     final url = Uri.parse('$baseUrl/api/notifications/read-all');
-    final response = await http.put(url, headers: _headers());
+    final response = await _sendWithRetry('PUT', url);
 
     if (response.statusCode != 204 && response.statusCode != 200) {
       throw Exception(_parseError(response));
@@ -232,7 +336,7 @@ class ApiService {
 
   Future<RiderStats> getRiderStats() async {
     final url = Uri.parse('$baseUrl/api/delivery/rider/stats');
-    final response = await http.get(url, headers: _headers());
+    final response = await _sendWithRetry('GET', url);
 
     if (response.statusCode == 200) {
       return RiderStats.fromJson(jsonDecode(response.body));

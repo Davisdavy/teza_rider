@@ -7,24 +7,23 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:teza_rider/main.dart';
+import 'package:teza_rider/services/api_service.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
+  testWidgets('Splash screen rendering test', (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues({});
+
     // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+    await tester.pumpWidget(MyApp(apiService: ApiService()));
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    // Verify that the splash screen shows the app name.
+    expect(find.text('TEZA RIDER'), findsOneWidget);
+    expect(find.text('Delivery Executions & Jobs'), findsOneWidget);
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
-
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    // Let the delayed transitions/timers complete
+    await tester.pumpAndSettle(const Duration(seconds: 3));
   });
 }

@@ -10,32 +10,37 @@ import 'views/splash_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await AnalyticsService.instance.initialize();
-  runApp(const MyApp());
+  
+  final apiService = ApiService();
+  await apiService.loadPersistedTokens();
+
+  runApp(MyApp(apiService: apiService));
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final ApiService apiService;
+  const MyApp({super.key, required this.apiService});
 
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        Provider<ApiService>(
-          create: (_) => ApiService(),
+        Provider<ApiService>.value(
+          value: apiService,
         ),
         Provider<AnalyticsService>(
           create: (_) => AnalyticsService.instance,
         ),
         ChangeNotifierProxyProvider<ApiService, AuthProvider>(
           create: (context) => AuthProvider(
-            context.read<ApiService>(),
+            apiService,
             context.read<AnalyticsService>(),
           ),
           update: (context, api, auth) => auth ?? AuthProvider(api, context.read<AnalyticsService>()),
         ),
         ChangeNotifierProxyProvider<ApiService, JobProvider>(
           create: (context) => JobProvider(
-            context.read<ApiService>(),
+            apiService,
             context.read<AnalyticsService>(),
           ),
           update: (context, api, job) => job ?? JobProvider(api, context.read<AnalyticsService>()),

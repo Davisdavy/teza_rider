@@ -40,8 +40,9 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     if (!mounted) return;
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    // If we have token persistence we would load it here. For the MVP, we check if authenticated.
-    if (authProvider.isAuthenticated) {
+    final isLoggedIn = await authProvider.tryAutoLogin();
+
+    if (isLoggedIn && mounted) {
       final jobProvider = Provider.of<JobProvider>(context, listen: false);
       await jobProvider.checkActiveJob();
       if (mounted) {
@@ -50,9 +51,11 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
         );
       }
     } else {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
-      );
+      if (mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
+        );
+      }
     }
   }
 
