@@ -188,7 +188,20 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
           ),
           Switch(
             value: job.isOnline,
-            onChanged: !approved ? null : _onToggleDuty,
+            onChanged: !approved
+                ? null
+                : (val) {
+                    if (job.activeJob != null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('You cannot go offline during an active delivery!'),
+                          backgroundColor: Color(0xFFFF5252),
+                        ),
+                      );
+                      return;
+                    }
+                    _onToggleDuty(val);
+                  },
             activeColor: const Color(0xFF00E676),
             activeTrackColor: const Color(0xFF00E676).withOpacity(0.2),
             inactiveThumbColor: Colors.white54,

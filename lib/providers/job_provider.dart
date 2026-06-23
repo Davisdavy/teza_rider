@@ -110,6 +110,12 @@ class JobProvider extends ChangeNotifier {
 
   // Toggle duty status
   Future<bool> toggleOnline(bool online) async {
+    if (!online && _activeJob != null) {
+      _errorMessage = 'You cannot go offline during an active delivery.';
+      notifyListeners();
+      return false;
+    }
+
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();

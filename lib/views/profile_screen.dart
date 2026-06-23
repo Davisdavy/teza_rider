@@ -70,6 +70,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final jobProvider = Provider.of<JobProvider>(context, listen: false);
     
+    if (jobProvider.activeJob != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You cannot log out during an active delivery!'),
+          backgroundColor: Color(0xFFFF5252),
+        ),
+      );
+      return;
+    }
+    
     // Stop all tracking loops
     jobProvider.toggleOnline(false);
     authProvider.logout();
