@@ -1,8 +1,10 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:http/http.dart' as http;
 import '../models/delivery.dart';
 import '../providers/auth_provider.dart';
 import '../providers/job_provider.dart';
@@ -19,6 +21,14 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
   late AnimationController _pulseController;
   final MapController _mapController = MapController();
   bool _isLightMap = false;
+
+  // Route points and map state
+  bool _isMapExpanded = false;
+  List<LatLng> _tripRoute = [];
+  List<LatLng> _activeLegRoute = [];
+  LatLng? _lastRiderLatLng;
+  String? _lastFetchedKey;
+  bool _isFetchingRoute = false;
 
   @override
   void initState() {
@@ -237,7 +247,71 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
       return _buildActiveJobView(job);
     }
 
+    // Clear routes if no active job
+    _tripRoute.clear();
+    _activeLegRoute.clear();
+    _lastFetchedKey = null;
+    _lastRiderLatLng = null;
+
     return _buildScanningRadarView(job);
+  }
+
+  // --- OSRM Routing Helpers ---
+
+  void _checkAndFetchRoute(LatLng rider, LatLng pickup, LatLng dropoff, String deliveryId, String status) async {
+    final isGoingToPickup = status == 'ASSIGNED' || status == 'ARRIVED';
+    final target = isGoingToPickup ? pickup : dropoff;
+    
+    final riderMovedSignificantly = _lastRiderLatLng == null ||
+        (rider.latitude - _lastRiderLatLng!.latitude).abs() > 0.0005 ||
+        (rider.longitude - _lastRiderLatLng!.longitude).abs() > 0.0005;
+
+    final key = '${deliveryId}_${status}';
+    if (key != _lastFetchedKey || riderMovedSignificantly) {
+      if (_isFetchingRoute) return;
+      _isFetchingRoute = true;
+      _lastRiderLatLng = rider;
+      _lastFetchedKey = key;
+      
+      try {
+        List<LatLng> trip = _tripRoute;
+        if (trip.isEmpty || trip.first != pickup || trip.last != dropoff) {
+          trip = await _getOSRMRoute(pickup, dropoff);
+        }
+        
+        final leg = await _getOSRMRoute(rider, target);
+        
+        if (mounted) {
+          setState(() {
+            _tripRoute = trip;
+            _activeLegRoute = leg;
+          });
+        }
+      } catch (e) {
+        debugPrint('Error updating routes: $e');
+      } finally {
+        _isFetchingRoute = false;
+      }
+    }
+  }
+
+  Future<List<LatLng>> _getOSRMRoute(LatLng start, LatLng end) async {
+    final url = Uri.parse('https://router.project-osrm.org/route/v1/driving/'
+        '${start.longitude},${start.latitude};${end.longitude},${end.latitude}'
+        '?overview=full&geometries=geojson');
+    try {
+      final response = await http.get(url).timeout(const Duration(seconds: 5));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['routes'] != null && data['routes'].isNotEmpty) {
+          final coordinates = data['routes'][0]['geometry']['coordinates'] as List;
+          return coordinates.map((coord) => LatLng(coord[1] as double, coord[0] as double)).toList();
+        }
+      }
+    } catch (e) {
+      debugPrint('OSRM routing error: $e');
+    }
+    return [start, end];
   }
 
   // View shown when rider profile is PENDING onboarding approval
@@ -919,6 +993,11 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
     final dropoffLatLng = LatLng(delivery.dropoffLatitude, delivery.dropoffLongitude);
     final targetLatLng = LatLng(targetLat, targetLng);
 
+    // Schedule fetching road route points safely
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAndFetchRoute(riderLatLng, pickupLatLng, dropoffLatLng, delivery.id, delivery.status);
+    });
+
     // Tile URLs
     final darkTileUrl = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
     final lightTileUrl = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
@@ -928,8 +1007,12 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
     final routeColor = _isLightMap ? const Color(0xFF00796B) : const Color(0xFF00E676);
     final totalPathColor = _isLightMap ? Colors.black38 : Colors.white24;
 
-    return Container(
-      height: 280,
+    final mapHeight = _isMapExpanded ? 480.0 : 280.0;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+      height: mapHeight,
       margin: const EdgeInsets.only(bottom: 20),
       decoration: BoxDecoration(
         color: const Color(0xFF151622),
@@ -968,14 +1051,14 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                   polylines: [
                     // Entire journey (Pickup to Dropoff) - dashed/thin
                     Polyline(
-                      points: [pickupLatLng, dropoffLatLng],
+                      points: _tripRoute.isNotEmpty ? _tripRoute : [pickupLatLng, dropoffLatLng],
                       color: totalPathColor,
                       strokeWidth: 2.0,
                       pattern: StrokePattern.dashed(segments: [8, 4]),
                     ),
                     // Active leg (Rider to next Target) - bright and highly visible
                     Polyline(
-                      points: [riderLatLng, targetLatLng],
+                      points: _activeLegRoute.isNotEmpty ? _activeLegRoute : [riderLatLng, targetLatLng],
                       color: routeColor,
                       strokeWidth: 4.5,
                     ),
@@ -1115,6 +1198,33 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
               right: 12,
               child: Column(
                 children: [
+                  // Expand / Collapse Map
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF151622).withOpacity(0.9),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white.withOpacity(0.1)),
+                    ),
+                    child: IconButton(
+                      icon: Icon(
+                        _isMapExpanded ? Icons.fullscreen_exit : Icons.fullscreen,
+                        color: const Color(0xFF00E676),
+                        size: 18,
+                      ),
+                      tooltip: _isMapExpanded ? 'Collapse Map' : 'Expand Map',
+                      onPressed: () {
+                        setState(() {
+                          _isMapExpanded = !_isMapExpanded;
+                        });
+                      },
+                      constraints: const BoxConstraints(
+                        minWidth: 36,
+                        minHeight: 36,
+                      ),
+                      padding: EdgeInsets.zero,
+                    ),
+                  ),
                   // Recenter on Target
                   Container(
                     margin: const EdgeInsets.only(bottom: 8),
