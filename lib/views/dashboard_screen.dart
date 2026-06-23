@@ -314,6 +314,23 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
     return [start, end];
   }
 
+  int _findClosestPointIndex(LatLng point, List<LatLng> points) {
+    if (points.isEmpty) return -1;
+    int closestIndex = 0;
+    double minDistance = double.maxFinite;
+    
+    for (int i = 0; i < points.length; i++) {
+      final dLat = points[i].latitude - point.latitude;
+      final dLng = points[i].longitude - point.longitude;
+      final dist = dLat * dLat + dLng * dLng;
+      if (dist < minDistance) {
+        minDistance = dist;
+        closestIndex = i;
+      }
+    }
+    return closestIndex;
+  }
+
   // View shown when rider profile is PENDING onboarding approval
   Widget _buildPendingApprovalView() {
     return Center(
@@ -1049,19 +1066,50 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                 ),
                 PolylineLayer(
                   polylines: [
-                    // Entire journey (Pickup to Dropoff) - dashed/thin
-                    Polyline(
-                      points: _tripRoute.isNotEmpty ? _tripRoute : [pickupLatLng, dropoffLatLng],
-                      color: totalPathColor,
-                      strokeWidth: 2.0,
-                      pattern: StrokePattern.dashed(segments: [8, 4]),
-                    ),
-                    // Active leg (Rider to next Target) - bright and highly visible
-                    Polyline(
-                      points: _activeLegRoute.isNotEmpty ? _activeLegRoute : [riderLatLng, targetLatLng],
-                      color: routeColor,
-                      strokeWidth: 4.5,
-                    ),
+                    if (delivery.status == 'PICKED_UP' || delivery.status == 'IN_TRANSIT') ...[
+                      // Traversed portion of trip (greyed out)
+                      () {
+                        final closestIdx = _findClosestPointIndex(riderLatLng, _tripRoute);
+                        if (closestIdx > 0 && _tripRoute.isNotEmpty) {
+                          return Polyline(
+                            points: _tripRoute.sublist(0, closestIdx + 1),
+                            color: _isLightMap ? Colors.black26 : Colors.white24,
+                            strokeWidth: 4.0,
+                          );
+                        }
+                        return Polyline(points: [], color: Colors.transparent);
+                      }(),
+                      // Remaining portion of trip (active leg)
+                      () {
+                        final closestIdx = _findClosestPointIndex(riderLatLng, _tripRoute);
+                        if (closestIdx != -1 && _tripRoute.isNotEmpty) {
+                          return Polyline(
+                            points: _tripRoute.sublist(closestIdx),
+                            color: routeColor,
+                            strokeWidth: 4.5,
+                          );
+                        }
+                        return Polyline(
+                          points: _tripRoute.isNotEmpty ? _tripRoute : [pickupLatLng, dropoffLatLng],
+                          color: routeColor,
+                          strokeWidth: 4.5,
+                        );
+                      }(),
+                    ] else ...[
+                      // Entire journey (Pickup to Dropoff) - dashed/thin
+                      Polyline(
+                        points: _tripRoute.isNotEmpty ? _tripRoute : [pickupLatLng, dropoffLatLng],
+                        color: totalPathColor,
+                        strokeWidth: 2.0,
+                        pattern: StrokePattern.dashed(segments: [8, 4]),
+                      ),
+                      // Active leg (Rider to next Target) - bright and highly visible
+                      Polyline(
+                        points: _activeLegRoute.isNotEmpty ? _activeLegRoute : [riderLatLng, targetLatLng],
+                        color: routeColor,
+                        strokeWidth: 4.5,
+                      ),
+                    ],
                   ],
                 ),
                 MarkerLayer(
