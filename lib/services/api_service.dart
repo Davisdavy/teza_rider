@@ -9,7 +9,17 @@ import '../models/notification.dart';
 import '../models/rider_stats.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://192.168.100.9:8080';
+  static String get baseUrl {
+    const envUrl = String.fromEnvironment('API_URL');
+    if (envUrl.isNotEmpty) return envUrl;
+    
+    final host = Uri.base.host;
+    if (host.isNotEmpty && host != 'localhost') {
+      return '${Uri.base.scheme}://$host:8080';
+    }
+    
+    return 'http://localhost:8080';
+  }
   String? _token;
   String? _refreshToken;
   void Function()? onSessionExpired;
