@@ -9,7 +9,7 @@ import '../models/notification.dart';
 import '../models/rider_stats.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://192.168.100.8:8080';
+  static const String baseUrl = 'http://192.168.100.9:8080';
   String? _token;
   String? _refreshToken;
   void Function()? onSessionExpired;
