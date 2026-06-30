@@ -288,6 +288,25 @@ class JobProvider extends ChangeNotifier {
         _startLocationUpdates();
       } else {
         _activeJob = null;
+        try {
+          final profile = await _apiService.getRiderProfile();
+          _isOnline = profile.available;
+          if (_isOnline) {
+            final pos = await _locationService.getCurrentPosition();
+            if (pos != null) {
+              _latitude = pos.latitude;
+              _longitude = pos.longitude;
+              _speed = pos.speed;
+              _updateCurrentArea(_latitude, _longitude);
+            }
+            await _apiService.updateLocation(_latitude, _longitude);
+            _startLocationUpdates();
+            _startOffersPolling();
+            await _registerFCMToken();
+          }
+        } catch (profileError) {
+          debugPrint('Failed to restore rider profile state during checkActiveJob: $profileError');
+        }
       }
       
       // Load rider statistics
