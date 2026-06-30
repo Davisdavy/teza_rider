@@ -176,7 +176,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
               Text(
                 !approved
                     ? 'BLOCKED ($onboardingStatus)'
-                    : (job.isOnline ? 'ON DUTY - ONLINE' : 'OFF DUTY - OFFLINE'),
+                    : (job.isOnline ? 'Availability - ONLINE' : 'Availability - OFFLINE'),
                 style: GoogleFonts.inter(
                   fontWeight: FontWeight.w700,
                   fontSize: 13,
@@ -632,7 +632,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                       ),
                     ),
                     Text(
-                      'KSh ${delivery.deliveryFee.toStringAsFixed(2)}',
+                      'KSh ${delivery.deliveryFee.toStringAsFixed(0)}',
                       style: GoogleFonts.outfit(
                         color: const Color(0xFF00E676),
                         fontSize: 20,
@@ -881,7 +881,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                       style: GoogleFonts.inter(color: Colors.white38, fontSize: 13),
                     ),
                     Text(
-                      'KSh ${delivery.deliveryFee.toStringAsFixed(2)}',
+                      'KSh ${delivery.deliveryFee.toStringAsFixed(0)}',
                       style: GoogleFonts.outfit(
                         color: const Color(0xFF00E676),
                         fontSize: 18,
