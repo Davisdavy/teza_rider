@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user.dart';
@@ -13,12 +15,17 @@ class ApiService {
     const envUrl = String.fromEnvironment('API_URL');
     if (envUrl.isNotEmpty) return envUrl;
     
-    final host = Uri.base.host;
-    if (host.isNotEmpty && host != 'localhost') {
-      return '${Uri.base.scheme}://$host:8080';
+    if (kIsWeb) {
+      final host = Uri.base.host;
+      if (host.isNotEmpty && host != 'localhost') {
+        return '${Uri.base.scheme}://$host:8080';
+      }
+      return 'http://localhost:8080';
     }
     
-    return 'http://localhost:8080';
+    // For mobile devices (emulators & physical devices connected wirelessly via Wi-Fi):
+    // 192.168.100.49 is the host Mac's local IP address on your current Wi-Fi network.
+    return 'http://192.168.100.49:8080';
   }
   String? _token;
   String? _refreshToken;
