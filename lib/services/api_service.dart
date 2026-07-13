@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user.dart';
@@ -13,9 +15,17 @@ class ApiService {
     const envUrl = String.fromEnvironment('API_URL');
     if (envUrl.isNotEmpty) return envUrl;
     
-    final host = Uri.base.host;
-    if (host.isNotEmpty && host != 'localhost') {
-      return '${Uri.base.scheme}://$host:8080';
+    if (kIsWeb) {
+      final host = Uri.base.host;
+      if (host.isNotEmpty && host != 'localhost') {
+        return '${Uri.base.scheme}://$host:8080';
+      }
+      return 'http://localhost:8080';
+    }
+    
+    if (Platform.isAndroid) {
+      // 10.0.2.2 connects the Android emulator to the host Mac loopback (localhost:8080)
+      return 'http://10.0.2.2:8080';
     }
     
     return 'http://localhost:8080';
