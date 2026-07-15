@@ -20,12 +20,13 @@ class ApiService {
       if (host.isNotEmpty && host != 'localhost') {
         return '${Uri.base.scheme}://$host:8080';
       }
-      return 'http://localhost:8080';
+      return 'http://212.56.45.149/teza';
     }
     
     // For mobile devices (emulators & physical devices connected wirelessly via Wi-Fi):
     // 192.168.100.49 is the host Mac's local IP address on your current Wi-Fi network.
-    return 'http://192.168.100.49:8080';
+    // return 'http://192.168.100.49:8080';
+      return 'http://212.56.45.149/teza';
   }
   String? _token;
   String? _refreshToken;
@@ -312,15 +313,19 @@ class ApiService {
     }
   }
 
-  Future<Delivery> updateDeliveryStatus(String deliveryId, String status, {String? reason}) async {
+  Future<Delivery> updateDeliveryStatus(String deliveryId, String status, {String? reason, String? otp}) async {
     final url = Uri.parse('$baseUrl/api/delivery/$deliveryId/status');
+    final body = <String, dynamic>{
+      'status': status,
+      'reason': reason ?? 'Rider updated status to $status',
+    };
+    if (otp != null) {
+      body['otp'] = otp;
+    }
     final response = await _sendWithRetry(
       'PUT',
       url,
-      body: jsonEncode({
-        'status': status,
-        'reason': reason ?? 'Rider updated status to $status',
-      }),
+      body: jsonEncode(body),
     );
 
     if (response.statusCode == 200) {
