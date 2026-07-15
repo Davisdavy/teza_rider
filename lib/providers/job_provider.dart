@@ -669,7 +669,7 @@ class JobProvider extends ChangeNotifier {
   }
 
   // Status transitions
-  Future<bool> updateJobStatus(String newStatus) async {
+  Future<bool> updateJobStatus(String newStatus, {String? otp}) async {
     if (_activeJob == null) return false;
     _isLoading = true;
     _errorMessage = null;
@@ -679,6 +679,7 @@ class JobProvider extends ChangeNotifier {
       final updated = await _apiService.updateDeliveryStatus(
         _activeJob!.id,
         newStatus,
+        otp: otp,
       );
 
       // Log delivery execution progress step
