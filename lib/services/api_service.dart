@@ -20,13 +20,13 @@ class ApiService {
       if (host.isNotEmpty && host != 'localhost') {
         return '${Uri.base.scheme}://$host:8080';
       }
-      return 'http://212.56.45.149/teza';
+      return 'http://localhost:8080';
     }
     
     // For mobile devices (emulators & physical devices connected wirelessly via Wi-Fi):
     // 192.168.100.49 is the host Mac's local IP address on your current Wi-Fi network.
     // return 'http://192.168.100.49:8080';
-      return 'http://212.56.45.149/teza';
+      return 'http://192.168.100.49:8080';
   }
   String? _token;
   String? _refreshToken;
