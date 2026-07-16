@@ -739,6 +739,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
     final otpController = TextEditingController();
     final formKey = GlobalKey<FormState>();
     bool isSubmitting = false;
+    String? dialogError;
 
     showDialog(
       context: context,
@@ -747,212 +748,243 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
       builder: (dialogContext) {
         return StatefulBuilder(
           builder: (ctx, setDialogState) {
-            return Dialog(
-              backgroundColor: Colors.transparent,
-              insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: const Color(0xFF12131F),
-                  borderRadius: BorderRadius.circular(28),
-                  border: Border.all(color: const Color(0xFF00E676).withOpacity(0.3), width: 1.5),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF00E676).withOpacity(0.08),
-                      blurRadius: 40,
-                      spreadRadius: 4,
-                    ),
-                  ],
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(28),
-                  child: Form(
-                    key: formKey,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Header icon
-                        Container(
-                          width: 64,
-                          height: 64,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: const Color(0xFF00E676).withOpacity(0.12),
-                            border: Border.all(color: const Color(0xFF00E676).withOpacity(0.4), width: 1.5),
-                          ),
-                          child: const Icon(Icons.verified_rounded, color: Color(0xFF00E676), size: 30),
-                        ),
-                        const SizedBox(height: 20),
-
-                        // Title
-                        Text(
-                          'Proof of Delivery',
-                          style: GoogleFonts.outfit(
-                            color: Colors.white,
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-
-                        // Subtitle
-                        Text(
-                          'Ask the customer for their 6-digit verification code and enter it below to confirm delivery.',
-                          textAlign: TextAlign.center,
-                          style: GoogleFonts.inter(
-                            color: Colors.white54,
-                            fontSize: 13,
-                            height: 1.6,
-                          ),
-                        ),
-                        const SizedBox(height: 28),
-
-                        // OTP Input Field
-                        TextFormField(
-                          controller: otpController,
-                          keyboardType: TextInputType.number,
-                          maxLength: 6,
-                          textAlign: TextAlign.center,
-                          style: GoogleFonts.outfit(
-                            color: Colors.white,
-                            fontSize: 32,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 12,
-                          ),
-                          decoration: InputDecoration(
-                            counterText: '',
-                            hintText: '------',
-                            hintStyle: GoogleFonts.outfit(
-                              color: Colors.white12,
-                              fontSize: 32,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 12,
-                            ),
-                            filled: true,
-                            fillColor: const Color(0xFF1E1F2E),
-                            contentPadding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(16),
-                              borderSide: BorderSide(color: Colors.white12),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(16),
-                              borderSide: BorderSide(color: Colors.white12),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(16),
-                              borderSide: const BorderSide(color: Color(0xFF00E676), width: 1.5),
-                            ),
-                            errorBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(16),
-                              borderSide: const BorderSide(color: Color(0xFFFF5252), width: 1.5),
-                            ),
-                            focusedErrorBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(16),
-                              borderSide: const BorderSide(color: Color(0xFFFF5252), width: 1.5),
-                            ),
-                          ),
-                          validator: (val) {
-                            if (val == null || val.trim().isEmpty) {
-                              return 'Please enter the verification code';
-                            }
-                            if (val.trim().length != 6) {
-                              return 'Code must be exactly 6 digits';
-                            }
-                            if (!RegExp(r'^\d{6}$').hasMatch(val.trim())) {
-                              return 'Code must contain digits only';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 8),
-
-                        // Hint
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
+            return PopScope(
+              canPop: false,
+              child: Dialog(
+                backgroundColor: Colors.transparent,
+                insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF12131F),
+                    borderRadius: BorderRadius.circular(28),
+                    border: Border.all(color: const Color(0xFF00E676).withOpacity(0.3), width: 1.5),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF00E676).withOpacity(0.08),
+                        blurRadius: 40,
+                        spreadRadius: 4,
+                      ),
+                    ],
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(28),
+                    child: Form(
+                      key: formKey,
+                      child: SingleChildScrollView(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.info_outline_rounded, color: Colors.white24, size: 13),
-                            const SizedBox(width: 6),
+                            // Header icon
+                            Container(
+                              width: 64,
+                              height: 64,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: const Color(0xFF00E676).withOpacity(0.12),
+                                border: Border.all(color: const Color(0xFF00E676).withOpacity(0.4), width: 1.5),
+                              ),
+                              child: const Icon(Icons.verified_rounded, color: Color(0xFF00E676), size: 30),
+                            ),
+                            const SizedBox(height: 20),
+    
+                            // Title
                             Text(
-                              'The customer received this code via SMS',
-                              style: GoogleFonts.inter(color: Colors.white24, fontSize: 11),
+                              'Proof of Delivery',
+                              style: GoogleFonts.outfit(
+                                color: Colors.white,
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+    
+                            // Subtitle
+                            Text(
+                              'Ask the customer for their 6-digit verification code and enter it below to confirm delivery.',
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.inter(
+                                color: Colors.white54,
+                                fontSize: 13,
+                                height: 1.6,
+                              ),
+                            ),
+                            const SizedBox(height: 28),
+    
+                            // OTP Input Field
+                            TextFormField(
+                              controller: otpController,
+                              keyboardType: TextInputType.number,
+                              maxLength: 6,
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.outfit(
+                                color: Colors.white,
+                                fontSize: 32,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 12,
+                              ),
+                              decoration: InputDecoration(
+                                counterText: '',
+                                hintText: '------',
+                                hintStyle: GoogleFonts.outfit(
+                                  color: Colors.white12,
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 12,
+                                ),
+                                filled: true,
+                                fillColor: const Color(0xFF1E1F2E),
+                                contentPadding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide(color: Colors.white12),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide(color: Colors.white12),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: const BorderSide(color: Color(0xFF00E676), width: 1.5),
+                                ),
+                                errorBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: const BorderSide(color: Color(0xFFFF5252), width: 1.5),
+                                ),
+                                focusedErrorBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: const BorderSide(color: Color(0xFFFF5252), width: 1.5),
+                                ),
+                              ),
+                              validator: (val) {
+                                if (val == null || val.trim().isEmpty) {
+                                  return 'Please enter the verification code';
+                                }
+                                if (val.trim().length != 6) {
+                                  return 'Code must be exactly 6 digits';
+                                }
+                                if (!RegExp(r'^\d{6}$').hasMatch(val.trim())) {
+                                  return 'Code must contain digits only';
+                                }
+                                return null;
+                              },
+                              onChanged: (val) {
+                                if (dialogError != null) {
+                                  setDialogState(() => dialogError = null);
+                                }
+                              },
+                            ),
+                            const SizedBox(height: 8),
+    
+                            // Hint
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.info_outline_rounded, color: Colors.white24, size: 13),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'The customer received this code via SMS',
+                                  style: GoogleFonts.inter(color: Colors.white24, fontSize: 11),
+                                ),
+                              ],
+                            ),
+                            
+                            if (dialogError != null) ...[
+                              const SizedBox(height: 16),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFF5252).withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: const Color(0xFFFF5252).withOpacity(0.3)),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.error_outline_rounded, color: Color(0xFFFF5252), size: 18),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Text(
+                                        dialogError!,
+                                        style: GoogleFonts.inter(
+                                          color: const Color(0xFFFF5252),
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                            const SizedBox(height: 28),
+    
+                            // Confirm Button
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton(
+                                onPressed: isSubmitting
+                                    ? null
+                                    : () async {
+                                        if (!formKey.currentState!.validate()) return;
+                                        setDialogState(() {
+                                          isSubmitting = true;
+                                          dialogError = null;
+                                        });
+    
+                                        final code = otpController.text.trim();
+                                        final success = await job.updateJobStatus('DELIVERED', otp: code);
+                                        
+                                        if (success) {
+                                          if (dialogContext.mounted) {
+                                            Navigator.of(dialogContext).pop();
+                                          }
+                                        } else {
+                                          if (dialogContext.mounted) {
+                                            setDialogState(() {
+                                              isSubmitting = false;
+                                              dialogError = job.errorMessage ?? 'Invalid verification code. Please try again.';
+                                            });
+                                          }
+                                        }
+                                      },
+                                style: ElevatedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(vertical: 18),
+                                  backgroundColor: const Color(0xFF00E676),
+                                  disabledBackgroundColor: const Color(0xFF00E676).withOpacity(0.4),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                  elevation: 0,
+                                ),
+                                child: isSubmitting
+                                    ? const SizedBox(
+                                        height: 20,
+                                        width: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2.5,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                    : Text(
+                                        'Verify & Complete Delivery',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w700,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+    
+                            // Cancel Button
+                            TextButton(
+                              onPressed: isSubmitting ? null : () => Navigator.of(dialogContext).pop(),
+                              child: Text(
+                                'Cancel',
+                                style: GoogleFonts.inter(color: Colors.white38, fontSize: 14),
+                              ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 28),
-
-                        // Confirm Button
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: isSubmitting
-                                ? null
-                                : () async {
-                                    if (!formKey.currentState!.validate()) return;
-                                    setDialogState(() => isSubmitting = true);
-
-                                    final code = otpController.text.trim();
-                                    Navigator.of(dialogContext).pop();
-
-                                    final success = await job.updateJobStatus('DELIVERED', otp: code);
-                                    if (!success && context.mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          backgroundColor: const Color(0xFFFF5252),
-                                          behavior: SnackBarBehavior.floating,
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                          content: Row(
-                                            children: [
-                                              const Icon(Icons.error_outline_rounded, color: Colors.white, size: 18),
-                                              const SizedBox(width: 10),
-                                              Expanded(
-                                                child: Text(
-                                                  job.errorMessage ?? 'Invalid verification code. Please try again.',
-                                                  style: GoogleFonts.inter(color: Colors.white, fontSize: 13),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      );
-                                    }
-                                  },
-                            style: ElevatedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 18),
-                              backgroundColor: const Color(0xFF00E676),
-                              disabledBackgroundColor: const Color(0xFF00E676).withOpacity(0.4),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                              elevation: 0,
-                            ),
-                            child: isSubmitting
-                                ? const SizedBox(
-                                    height: 20,
-                                    width: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2.5,
-                                      color: Colors.white,
-                                    ),
-                                  )
-                                : Text(
-                                    'Verify & Complete Delivery',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w700,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-
-                        // Cancel Button
-                        TextButton(
-                          onPressed: isSubmitting ? null : () => Navigator.of(dialogContext).pop(),
-                          child: Text(
-                            'Cancel',
-                            style: GoogleFonts.inter(color: Colors.white38, fontSize: 14),
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
                 ),
@@ -1050,7 +1082,9 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                 const Icon(Icons.access_time_rounded, color: Color(0xFF00E676), size: 18),
                 const SizedBox(width: 8),
                 Text(
-                  'Estimated Delivery Time: ${displayTime}Min',
+                  isGoingToPickup
+                      ? 'Estimated Pickup Time: ${displayTime}Min'
+                      : 'Estimated Delivery Time: ${displayTime}Min',
                   style: GoogleFonts.inter(
                     fontWeight: FontWeight.bold,
                     color: const Color(0xFF00E676),
