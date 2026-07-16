@@ -1082,7 +1082,9 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                 const Icon(Icons.access_time_rounded, color: Color(0xFF00E676), size: 18),
                 const SizedBox(width: 8),
                 Text(
-                  'Estimated Delivery Time: ${displayTime}Min',
+                  isGoingToPickup
+                      ? 'Estimated Pickup Time: ${displayTime}Min'
+                      : 'Estimated Delivery Time: ${displayTime}Min',
                   style: GoogleFonts.inter(
                     fontWeight: FontWeight.bold,
                     color: const Color(0xFF00E676),
